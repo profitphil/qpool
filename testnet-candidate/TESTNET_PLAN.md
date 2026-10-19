@@ -33,7 +33,8 @@ C. IPO (needs a contract in its IPO epoch):
    5. A failed IPO (fewer than 676 bids) returns everything. Two IPOs in one epoch.
 D. END_EPOCH revenue (new): feed revenue (pool fee, join fees, a stray transfer, a donation) then change epoch. Check:
    40 percent paid per share, 30 percent arrives at QPAYHUB, 20 percent appears in `qpayBuyPot` (GetStats), 10 percent plus
-   leftovers burned, `pendingRevenue` back to 0. Try revenue of 1, 100, 844, 845 and 1,000,000 QU. Check a stray wallet
+   leftovers burned, `pendingRevenue` back to 0. Expected: 1,000,000 QU gives per-share 591 (399,516 paid), 300,000 to QPAYHUB, 200,000 to the pot, 100,484 burned;
+   1,690 QU gives 676 paid, 507, 338, 169 burned; 1,689 QU pays no shareholder; 100 QU gives 0, 30, 20, 50 burned. Check a stray wallet
    transfer lands in `pendingRevenue` (not `globalUnattributed`) and QX/QSWAP in-call payments still do not.
 E. BuyAndBurnQpay (new): empty pot returns NOTHING_TO_BUY and writes nothing; no asks; asks above 10,000 untouched; several
    price levels bought lowest first at their own prices; more than 8 levels (rest waits); QX management hand-over and the

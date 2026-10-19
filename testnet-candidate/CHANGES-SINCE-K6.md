@@ -13,7 +13,8 @@ on them, at the owner's request: the testnet is the test. The old gtest file `co
      transfers into its dividend pool.
    - 20% moves into `qpayBuyPot`, an earmark inside the contract balance. It is not revenue and END_EPOCH never pays it out.
    - 10% plus every rounding leftover is burned into the fee reserve. A leg that cannot be paid also falls into the burn.
-   - Revenue under 845 QU in an epoch pays no shareholder and is burned in full.
+   - Revenue under 1,690 QU in an epoch pays no shareholder (40 percent of it divides to less than 1 QU per share); that part
+     falls into the burn. The 30 and 20 percent legs are still paid.
 3. **Unattributed money becomes dividends.** In the incoming-transfer hook, anything that matches no ledger now goes to
    `pendingRevenue` and so through the split above: a plain wallet transfer, a contract dividend with no ledger, a
    revenue donation. Nothing is ever sent back. The one exception is `qpiTransfer` from QX or QSWAP, which stays parked in
