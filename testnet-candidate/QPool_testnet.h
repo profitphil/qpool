@@ -378,8 +378,9 @@ constexpr uint64 QPOOL_REVENUE_QPAYHUB_PERMILLE     = 300; // 30% deposited into
 constexpr uint64 QPOOL_REVENUE_QPAYBUY_PERMILLE     = 200; // 20% set aside to buy QPAY tokens on QX and burn them
 // The rest (10 percent plus every rounding leftover) is burned into the fee reserve.
 static_assert(QPOOL_REVENUE_SHAREHOLDER_PERMILLE + QPOOL_REVENUE_QPAYHUB_PERMILLE + QPOOL_REVENUE_QPAYBUY_PERMILLE < 1000);
-// There is NO minimum payout: END_EPOCH splits whatever revenue exists. Anything under 845 QU pays no shareholder (80 percent of it
-// divides to less than 1 QU per share) and is burned in full.
+// There is NO minimum payout: END_EPOCH splits whatever revenue exists. Revenue under 1,690 QU in an epoch pays no shareholder (its 40
+// percent divides to less than 1 QU per share); that part falls into the burn with the other leftovers. The 30 and 20 percent legs
+// are paid in full whatever the amount.
 constexpr uint16 QPOOL_QPAYHUB_CONTRACT_INDEX = 29;       // QPAYHUB on qubic/core main (contract_def.h, 2026-10-14)
 // ---- QPAY buy-and-burn (owner decisions) ----
 // The token is {issuer QPAYNOWSWZMGHFEAEVJXGZAVSHABAZDDBDIHTEBOPCOGHRGBCYCUZOHCVLXG, name QPAY}; its name value 1497452625 is the one
