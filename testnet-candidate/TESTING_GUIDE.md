@@ -166,6 +166,7 @@ Use a real token on QX with real asks and bids.
 | F9 | 1 QU dividends in many small payments | each rounded down, none created; sum of claims never exceeds what came in |
 
 ### G. IPO (most important; needs a contract in its IPO epoch)
+Run section G+ (competitive battery with 3 to 4 pools) first; the cases below are the single-feature checks.
 Standard book: OUT1 bids 576 slots at 2,500. Pool A: budget 200,000 at opening price 2,000 gives 100 seats all-in, which fills the 676-slot book.
 There is NO ceiling price and NO voted share count: the budget is the only limit; seats = floor(money / price).
 | Id | Case | Expected |
@@ -357,6 +358,109 @@ A results table per suite is enough for passes:
 - Try to make `globalUnattributed` rise permanently.
 - Try to claim from a ledger before it is credited, and after retirement.
 - For every refusal, repeat the reward-refund and no-state-change checks of section 4.
+
+## G+. Competitive IPO battery: 3 to 4 pools plus outsiders (run this BEFORE suite G)
+
+One pool filling the book alone proves very little. Real IPOs are decided by several pools and outsiders outbidding each other
+in the last stretch. This battery runs 4 pools and 2 or 3 outsiders in the same IPO epoch, with rebids, collisions, refusals,
+pools that are wiped out, a failed IPO, and a last-minute snipe.
+
+**Tools in this folder.** `ipo_reference_model.py` is a small model of the core's bid rules and QPOOL's IPO accounting. It prints,
+step by step, the EXPECTED refusal code or result, the expected core book, each pool's books (free funds, at-risk, seats listed vs
+seats really in the book) and the final settlement. `ipo-war-expected/` holds its output for scripted wars W1 to W6 and for random
+wars (seeds 1 to 8, 80 steps). Regenerate any random war with `python3 ipo_reference_model.py random SEED STEPS`.
+The model is an aid, not an authority: the node's real book is the truth. A mismatch means "investigate", and the report should
+say whether the model or the contract was wrong.
+
+**Setup for one IPO epoch (reuse it for several wars, an IPO epoch costs real time).**
+- Two IPO targets T1 and T2 in the SAME IPO epoch (T2 is for the failed-IPO war and for settling in the opposite order).
+- Pools A, B, C, D, each with at least 3 members and uneven costs (for example 60/30/10), each with the war's budget as
+  `uncommitted` BEFORE its BUY_IPO proposal. All members vote yes. Schedule the five proposals so every Execute lands before the
+  outsiders fill the book. The IPO vote is 48 ticks and the execute window 96: write a tick table first.
+- Outsider wallets OUT1, OUT2, OUT3 with at least 5,000,000 QU each. A wallet IPO bid transaction must be the exact 16 byte
+  `ContractIPOBid` layout (price 8 bytes, quantity 2 bytes, padded to 16); a 10 byte payload is silently ignored as a plain transfer.
+- Pool wallets that call RebidIpo must own a seat in the holding. Use a small seat owner for some calls and a large one for others.
+- Leave at least 5 to 10 ticks between steps so each effect can be read. Never send two steps of a war in the same tick unless the
+  case says so.
+
+**Read after EVERY step.** The core book (the node's contract-IPO request: 676 prices and bidder keys); for every pool `GetIpoBids`
+and `GetHolding`; `GetStats` for `ipoRefundEscrow`; the contract balance. Then check:
+1. the return code equals the model's (a refusal must leave the state clean: compare reads before and after, reward returned);
+2. per pool, `free + atRisk = costBasis` (I4);
+3. seats listed by the contract versus seats really in the book: listed may exceed the real count only for seats pushed out since the
+   pool's last reconcile (outsider bids, or the pool's own last rebid); after a successful rebid, everything pushed out earlier is
+   freed and the listed counts equal the real counts except for the seats THAT rebid pushed out of the pool's own book;
+4. `ipoRefundEscrow` rose by exactly the refunds the model shows for pools, and fell by exactly what pools drew;
+5. no pool ever drew another pool's money (compare each pool's `free` with the model).
+
+### W1: four pools, three outsiders, escalating war (the flagship; every step with its expected result)
+Budgets and opening prices: A 200,000 at 2,000; B 150,000 at 1,500; C 120,000 at 1,200; D 90,000 at 900 (100 seats each, all-in).
+```
+  1. A Execute: budget 200,000 at opening 2,000 -> 100 seats, free 0
+  2. B Execute: budget 150,000 at opening 1,500 -> 100 seats, free 0
+  3. C Execute: budget 120,000 at opening 1,200 -> 100 seats, free 0
+  4. D Execute: budget 90,000 at opening 900 -> 100 seats, free 0
+  5. OUT1 bids 276 @ 1,800 -> refunds in the same transaction: no seat pushed out
+  6. OUT2 bids 30 @ 1,000 -> refunds in the same transaction: D +27,000
+  7. D RebidIpo @ 1,001 -> OK, 26 seats (cost 26,026); pushed out: none to others; own seats pushed out refund 23,400 (freed at the NEXT reconcile); free now 974
+  8. D RebidIpo @ 1,001 -> OK, 24 seats (cost 24,024); pushed out: none to others; own seats pushed out refund 21,600 (freed at the NEXT reconcile); free now 350
+  9. C RebidIpo @ 1,001 -> REFUSED IPO_PRICE_TAKEN; free 0
+ 10. B RebidIpo @ 1,550 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 11. OUT3 bids 60 @ 1,300 -> refunds in the same transaction: D +28,010, OUT2 +30,000
+ 12. D RebidIpo @ 1,001 -> REFUSED PRICE_TOO_LOW; free 350
+ 13. C RebidIpo @ 1,301 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 14. C RebidIpo @ 1,301 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 15. OUT2 bids 40 @ 1,600 -> refunds in the same transaction: D +40,040
+ 16. D RebidIpo @ 1,700 -> OK, 52 seats (cost 88,400); pushed out: C +62,400; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 1,600
+ 17. C RebidIpo @ 1,650 -> OK, 37 seats (cost 61,050); pushed out: none to others; own seats pushed out refund 44,400 (freed at the NEXT reconcile); free now 1,350
+ 18. B RebidIpo @ 1,620 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 19. OUT1 bids 50 @ 1,900 -> refunds in the same transaction: C +13,200, OUT3 +50,700
+ 20. B RebidIpo @ 1,901 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 21. C RebidIpo @ 1,651 -> OK, 35 seats (cost 57,785); pushed out: B +21,000, OUT3 +27,300; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 1,165
+ 22. D RebidIpo @ 1,701 -> REFUSED INSUFFICIENT_BALANCE; free 1,600
+```
+End of epoch: final price 1,500. A 100 seats, cost basis 150,000, returned 50,000. B 86, 129,000, 21,000. C 72, 108,000, 12,000.
+D 52, 78,000, 12,000. OUT1 326 seats, OUT2 40 seats, OUT3 none. Pools' cost basis plus returned = 560,000 = their budgets.
+Things this war proves: refunds for seats pushed out arrive in the outsider's own transaction; a pool pushes its OWN seats out when it
+rebids from the bottom; a price owned by another holding is refused even when the caller has no money; a tie with the book minimum
+is refused; a pool with no free funds is refused; seats shrink as prices rise (D ends with 52 seats for 90,000).
+
+### The other scripted wars (steps and expected books in `ipo-war-expected/`)
+| War | Idea | Final price | Expected outcome |
+|---|---|---|---|
+| W2 | W1's end state settled in several orders | 1,500 | every settle order gives W1's per-pool results (the result depends only on the final book). Use T2 with a mirrored war to settle in the opposite order |
+| W3 | three pools, book never fills (625 seats) | 0 (the IPO FAILS) | everything returned: A 300,000, B 200,000, C 100,000; holdings retire with no shares |
+| W4 | a pool is wiped out and comes back | 1,100 | A 100 seats (110,000 / 90,000 returned), B 100 (110,000 / 40,000), C 100 (110,000 / 10,000), D 81 (89,100 / 900) |
+| W5 | one outsider bid hurts B, C and D together; three pools race for the same price; the top pool has no free funds and is wiped out | 1,050 | A 0 seats, 100,000 returned; B, C, D 90 seats each (94,500 / 5,500). Also opening at a price another holding owns is refused. Run the race twice, with the three rebids in opposite orders |
+| W6 | an outsider snipes 250 slots at 3,000 at the end; the pools rebid at about 3,001 | 1,800 | A 100 seats (180,000 / 20,000), B 49 (88,200 / 61,800), C 39 (70,200 / 49,800), D 29 (52,200 / 37,800); OUT2 pays only the final price on its 250 seats |
+
+### W7: random wars (the "multiples and varieties" part)
+Take `ipo-war-expected/random-seedN-80steps.txt` (N = 1..8) or generate more seeds. Replay every step on the chain in order, one step
+per few ticks, and compare each step's accept or refuse code and the books, then the settlement. Run at least 8 seeds on at least two
+IPO epochs. Keep the seed and the full action list in the report. Each seed contains many refusals by design (price taken, too low,
+no money); a refusal that the chain accepts, or an acceptance that it refuses, is a finding.
+
+### Variations to apply to every war
+- Members inside each pool: 3 with costs 60/30/10, one whale with 5 dust members, equal thirds. After settlement each member's
+  returned amount must equal the pool's returned amount times the member's cost share, floor, within 1 QU per member, and the
+  members must sum to the pool total.
+- Who calls RebidIpo: the creator, a large seat owner, a tiny seat owner; once a stranger (must be refused).
+- Timing: rebids in the last 20 ticks of the epoch, an outsider bid in the same tick as a rebid (the order of the node decides:
+  record it and compare with the model for that order), a rebid on the very last tick.
+- A second war on T2 with the same pools: a pool may hold one holding per target; check the 8 IPO holdings per pool limit and that
+  prices are unique per target, not across targets.
+- Reserve: repeat one war with the contract's fee reserve low but positive; record the drain of each rebid.
+- Settle in different orders, by a keeper, by a member, before and after the other pools settle.
+- Dividends of the new contract while holdings are unsettled: parked until the last holding settles.
+
+### Pass criteria for the battery
+Every step matches the model (or the difference is explained and filed), every invariant holds after every step, settlement results
+match for every war and every settle order, no pool is ever charged for another pool's seats, the sum of every pool's cost basis and
+returned amount equals its budget, and no refusal changes state. Record any mismatch between the model and the chain with both books.
+
+### What the model does not cover
+Tick timing, the fee reserve, the refund pot clamp, the physical balance refusal (BOOKS_INCONSISTENT), per-member splits, and
+dividends. It also assumes the registry frees a price when a pool's reconcile finds no seats left at it.
 
 ---
 

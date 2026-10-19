@@ -1,0 +1,17 @@
+  1. A Execute: budget 300,000 at opening 1,500 -> 200 seats, free 0
+  2. B Execute: budget 200,000 at opening 1,000 -> 200 seats, free 0
+  3. C Execute: budget 100,000 at opening 800 -> 125 seats, free 0
+  4. OUT1 bids 100 @ 600 -> refunds in the same transaction: no seat pushed out
+  5. C RebidIpo @ 801 -> REFUSED INSUFFICIENT_BALANCE; free 0
+  6. B RebidIpo @ 1,001 -> REFUSED INSUFFICIENT_BALANCE; free 0
+     core book: A: 200@1,500; B: 200@1,000; C: 125@800; OUT1: 100@600   [625 slots, lowest 0]
+     A books: {'free': 0, 'atRisk': 300000, 'listed(books)': {1500: 200}, 'actual(core book)': {1500: 200}}
+     B books: {'free': 0, 'atRisk': 200000, 'listed(books)': {1000: 200}, 'actual(core book)': {1000: 200}}
+     C books: {'free': 0, 'atRisk': 100000, 'listed(books)': {800: 125}, 'actual(core book)': {800: 125}}
+
+END OF EPOCH: final price 0  (book not full: the IPO FAILS, everything is refunded)
+  A: {'seats': 200, 'shares': 0, 'costBasis': 0, 'returned': 300000}
+  B: {'seats': 200, 'shares': 0, 'costBasis': 0, 'returned': 200000}
+  C: {'seats': 125, 'shares': 0, 'costBasis': 0, 'returned': 100000}
+  OUT1: {'seats': 100, 'shares': 0, 'spent': 0, 'returned': 60000}
+  check: pools' costBasis + returned = 600,000 = total budgets 600,000

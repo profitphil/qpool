@@ -1,0 +1,62 @@
+  1. A Execute: budget 200,000 at opening 2,000 -> 100 seats, free 0
+  2. B Execute: budget 150,000 at opening 1,500 -> 100 seats, free 0
+  3. C Execute: budget 120,000 at opening 1,200 -> 100 seats, free 0
+  4. D Execute: budget 90,000 at opening 900 -> 100 seats, free 0
+  5. OUT1 bids 276 @ 1,800 -> refunds in the same transaction: no seat pushed out
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; D: 100@900; OUT1: 276@1,800   [676 slots, lowest 900]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 0, 'atRisk': 90000, 'listed(books)': {900: 100}, 'actual(core book)': {900: 100}}
+  6. OUT2 bids 30 @ 1,000 -> refunds in the same transaction: D +27,000
+  7. D RebidIpo @ 1,001 -> OK, 26 seats (cost 26,026); pushed out: none to others; own seats pushed out refund 23,400 (freed at the NEXT reconcile); free now 974
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; D: 26@1,001,44@900; OUT1: 276@1,800; OUT2: 30@1,000   [676 slots, lowest 900]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 974, 'atRisk': 89026, 'listed(books)': {900: 70, 1001: 26}, 'actual(core book)': {900: 44, 1001: 26}}
+  8. D RebidIpo @ 1,001 -> OK, 24 seats (cost 24,024); pushed out: none to others; own seats pushed out refund 21,600 (freed at the NEXT reconcile); free now 350
+  9. C RebidIpo @ 1,001 -> REFUSED IPO_PRICE_TAKEN; free 0
+ 10. B RebidIpo @ 1,550 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 11. OUT3 bids 60 @ 1,300 -> refunds in the same transaction: D +28,010, OUT2 +30,000
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; D: 40@1,001; OUT1: 276@1,800; OUT3: 60@1,300   [676 slots, lowest 1,001]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 350, 'atRisk': 89650, 'listed(books)': {900: 44, 1001: 50}, 'actual(core book)': {1001: 40}}
+ 12. D RebidIpo @ 1,001 -> REFUSED PRICE_TOO_LOW; free 350
+ 13. C RebidIpo @ 1,301 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 14. C RebidIpo @ 1,301 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 15. OUT2 bids 40 @ 1,600 -> refunds in the same transaction: D +40,040
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; OUT1: 276@1,800; OUT2: 40@1,600; OUT3: 60@1,300   [676 slots, lowest 1,200]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 350, 'atRisk': 89650, 'listed(books)': {900: 44, 1001: 50}, 'actual(core book)': {}}
+ 16. D RebidIpo @ 1,700 -> OK, 52 seats (cost 88,400); pushed out: C +62,400; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 1,600
+ 17. C RebidIpo @ 1,650 -> OK, 37 seats (cost 61,050); pushed out: none to others; own seats pushed out refund 44,400 (freed at the NEXT reconcile); free now 1,350
+ 18. B RebidIpo @ 1,620 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 19. OUT1 bids 50 @ 1,900 -> refunds in the same transaction: C +13,200, OUT3 +50,700
+     core book: A: 100@2,000; B: 100@1,500; C: 37@1,650; D: 52@1,700; OUT1: 50@1,900,276@1,800; OUT2: 40@1,600; OUT3: 21@1,300   [676 slots, lowest 1,300]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 1350, 'atRisk': 118650, 'listed(books)': {1200: 48, 1650: 37}, 'actual(core book)': {1650: 37}}
+     D books: {'free': 1600, 'atRisk': 88400, 'listed(books)': {1700: 52}, 'actual(core book)': {1700: 52}}
+ 20. B RebidIpo @ 1,901 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 21. C RebidIpo @ 1,651 -> OK, 35 seats (cost 57,785); pushed out: B +21,000, OUT3 +27,300; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 1,165
+ 22. D RebidIpo @ 1,701 -> REFUSED INSUFFICIENT_BALANCE; free 1,600
+     core book: A: 100@2,000; B: 86@1,500; C: 35@1,651,37@1,650; D: 52@1,700; OUT1: 50@1,900,276@1,800; OUT2: 40@1,600   [676 slots, lowest 1,500]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 86}}
+     C books: {'free': 1165, 'atRisk': 118835, 'listed(books)': {1650: 37, 1651: 35}, 'actual(core book)': {1650: 37, 1651: 35}}
+     D books: {'free': 1600, 'atRisk': 88400, 'listed(books)': {1700: 52}, 'actual(core book)': {1700: 52}}
+
+END OF EPOCH: final price 1,500
+  A: {'seats': 100, 'shares': 100, 'costBasis': 150000, 'returned': 50000}
+  B: {'seats': 86, 'shares': 86, 'costBasis': 129000, 'returned': 21000}
+  C: {'seats': 72, 'shares': 72, 'costBasis': 108000, 'returned': 12000}
+  D: {'seats': 52, 'shares': 52, 'costBasis': 78000, 'returned': 12000}
+  OUT1: {'seats': 326, 'shares': 326, 'spent': 489000, 'returned': 102800}
+  OUT2: {'seats': 40, 'shares': 40, 'spent': 60000, 'returned': 4000}
+  OUT3: {'seats': 0, 'shares': 0, 'spent': 0, 'returned': 0}
+  check: pools' costBasis + returned = 560,000 = total budgets 560,000

@@ -1,0 +1,100 @@
+  1. A Execute: budget 80,000 at opening 2,000 -> 40 seats, free 0
+  2. B Execute: budget 200,000 at opening 901 -> 221 seats, free 879
+  3. C Execute: budget 80,000 at opening 1,202 -> 66 seats, free 668
+  4. D Execute: budget 300,000 at opening 1,503 -> 199 seats, free 903
+  5. OUT1 bids 150 @ 1,000 -> refunds in the same transaction: no seat pushed out
+  6. A RebidIpo @ 1,041 -> REFUSED INSUFFICIENT_BALANCE; free 0
+  7. OUT1 bids 56 @ 1,275 -> refunds in the same transaction: B +50,456
+  8. OUT3 bids 44 @ 1,178 -> refunds in the same transaction: B +39,644
+  9. B RebidIpo @ 1,190 -> OK, 76 seats (cost 90,440); pushed out: none to others; own seats pushed out refund 68,476 (freed at the NEXT reconcile); free now 539
+ 10. OUT3 bids 17 @ 1,275 -> refunds in the same transaction: B +15,317
+ 11. A RebidIpo @ 901 qty 3 -> REFUSED IPO_PRICE_TAKEN; free 0
+ 12. C RebidIpo @ 1,111 -> REFUSED INSUFFICIENT_BALANCE; free 668
+ 13. D RebidIpo @ 950 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 14. C RebidIpo @ 951 -> REFUSED INSUFFICIENT_BALANCE; free 668
+ 15. B RebidIpo @ 1,086 -> OK, 77 seats (cost 83,622); pushed out: OUT1 +49,000; own seats pushed out refund 25,228 (freed at the NEXT reconcile); free now 710
+ 16. OUT1 bids 37 @ 1,264 -> refunds in the same transaction: no seat pushed out; own unregistered units back 37,000
+ 17. A RebidIpo @ 1,001 qty 3 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 18. D RebidIpo @ 1,156 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 19. A RebidIpo @ 1,046 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 20. OUT3 bids 13 @ 1,269 -> refunds in the same transaction: OUT1 +13,000
+ 21. C RebidIpo @ 1,160 -> REFUSED INSUFFICIENT_BALANCE; free 668
+ 22. B RebidIpo @ 1,000 qty 3 -> REFUSED PRICE_TOO_LOW; free 710
+ 23. B RebidIpo @ 1,108 -> OK, 23 seats (cost 25,484); pushed out: OUT1 +23,000; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 454
+ 24. A RebidIpo @ 1 -> REFUSED PRICE_TOO_LOW; free 0
+ 25. C RebidIpo @ 1,286 -> REFUSED INSUFFICIENT_BALANCE; free 668
+ 26. C RebidIpo @ 1,000 qty 3 -> REFUSED PRICE_TOO_LOW; free 668
+ 27. OUT2 bids 9 @ 1,149 -> refunds in the same transaction: OUT1 +9,000
+ 28. D RebidIpo @ 1 -> REFUSED PRICE_TOO_LOW; free 903
+ 29. OUT3 bids 26 @ 1,383 -> refunds in the same transaction: B +7,602, OUT1 +19,000
+ 30. D RebidIpo @ 1,212 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 31. D RebidIpo @ 1,315 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 32. OUT1 bids 28 @ 1,351 -> refunds in the same transaction: B +30,408
+ 33. OUT2 bids 53 @ 1,448 -> refunds in the same transaction: B +57,800
+ 34. OUT1 bids 48 @ 1,207 -> refunds in the same transaction: B +13,296, OUT2 +10,341, OUT3 +31,806
+ 35. C RebidIpo @ 1,178 qty 3 -> REFUSED PRICE_TOO_LOW; free 668
+ 36. B RebidIpo @ 1 -> REFUSED PRICE_TOO_LOW; free 454
+ 37. OUT1 bids 38 @ 1,307 -> refunds in the same transaction: B +24,990, OUT3 +20,026
+ 38. B RebidIpo @ 1,322 -> OK, 101 seats (cost 133,522); pushed out: C +55,292; own seats pushed out refund 65,450 (freed at the NEXT reconcile); free now 1,028
+ 39. OUT2 bids 60 @ 1,371 -> refunds in the same transaction: C +24,040, OUT1 +48,280
+ 40. OUT2 bids 60 @ 1,418 -> refunds in the same transaction: OUT1 +56,424, OUT3 +19,047
+ 41. OUT3 bids 18 @ 1,524 -> refunds in the same transaction: OUT1 +3,825; own unregistered units back 19,125
+ 42. OUT2 bids 31 @ 1,612 -> refunds in the same transaction: OUT1 +39,525
+ 43. OUT1 bids 25 @ 1,645 -> refunds in the same transaction: no seat pushed out; own unregistered units back 31,971
+ 44. OUT2 bids 52 @ 1,632 -> refunds in the same transaction: B +22,474, OUT1 +45,745
+ 45. OUT2 bids 43 @ 1,510 -> refunds in the same transaction: B +56,846
+ 46. D RebidIpo @ 1,459 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 47. D RebidIpo @ 1,572 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 48. B RebidIpo @ 1,322 -> REFUSED PRICE_TOO_LOW; free 1,028
+ 49. OUT2 bids 12 @ 1,352 -> refunds in the same transaction: B +15,864
+ 50. A RebidIpo @ 1,512 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 51. D RebidIpo @ 1,354 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 52. B RebidIpo @ 1,460 -> OK, 110 seats (cost 160,600); pushed out: OUT1 +37,828, OUT2 +72,435; own seats pushed out refund 38,338 (freed at the NEXT reconcile); free now 1,062
+ 53. OUT1 bids 52 @ 1,588 -> refunds in the same transaction: OUT2 +35,975, OUT3 +35,958
+ 54. OUT2 bids 31 @ 1,457 -> refunds in the same transaction: no seat pushed out; own unregistered units back 43,958
+ 55. A RebidIpo @ 1,608 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 56. B RebidIpo @ 1,543 -> OK, 25 seats (cost 38,575); pushed out: OUT2 +35,540; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 825
+ 57. OUT2 bids 3 @ 1,522 -> refunds in the same transaction: no seat pushed out; own unregistered units back 4,344
+ 58. A RebidIpo @ 1,449 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 59. D RebidIpo @ 1,685 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 60. A RebidIpo @ 1,449 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 61. B RebidIpo @ 1,449 -> REFUSED INSUFFICIENT_BALANCE; free 825
+ 62. C RebidIpo @ 1,680 -> OK, 47 seats (cost 78,960); pushed out: OUT2 +68,056; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 1,040
+ 63. OUT3 bids 51 @ 1,468 -> refunds in the same transaction: B +29,200, OUT2 +45,167
+ 64. B RebidIpo @ 1 qty 3 -> REFUSED PRICE_TOO_LOW; free 825
+ 65. OUT2 bids 36 @ 1,689 -> refunds in the same transaction: B +52,560
+ 66. D RebidIpo @ 1,757 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 67. C RebidIpo @ 1,647 -> REFUSED INSUFFICIENT_BALANCE; free 1,040
+ 68. C RebidIpo @ 1,478 -> REFUSED INSUFFICIENT_BALANCE; free 1,040
+ 69. C RebidIpo @ 1,604 -> REFUSED INSUFFICIENT_BALANCE; free 1,040
+ 70. D RebidIpo @ 1,681 -> REFUSED INSUFFICIENT_BALANCE; free 903
+ 71. OUT2 bids 46 @ 1,477 -> refunds in the same transaction: B +67,160
+ 72. B RebidIpo @ 1,583 -> OK, 94 seats (cost 148,802); pushed out: OUT2 +51,695, OUT3 +74,868; own seats pushed out refund 11,680 (freed at the NEXT reconcile); free now 943
+ 73. OUT3 bids 48 @ 1,494 -> refunds in the same transaction: OUT2 +16,247; own unregistered units back 55,278
+ 74. C RebidIpo @ 1,684 -> REFUSED INSUFFICIENT_BALANCE; free 1,040
+ 75. A RebidIpo @ 1,602 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 76. D RebidIpo @ 1,494 -> REFUSED PRICE_TOO_LOW; free 903
+ 77. A RebidIpo @ 1,699 -> REFUSED INSUFFICIENT_BALANCE; free 0
+ 78. OUT1 bids 48 @ 1,732 -> refunds in the same transaction: D +55,611, OUT3 +16,434
+ 79. OUT3 bids 9 @ 1,542 -> refunds in the same transaction: D +13,527
+ 80. C RebidIpo @ 1,770 -> REFUSED INSUFFICIENT_BALANCE; free 1,040
+ 81. B RebidIpo @ 1,773 -> OK, 7 seats (cost 12,411); pushed out: D +10,521; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 212
+ 82. B RebidIpo @ 1 qty 3 -> REFUSED PRICE_TOO_LOW; free 212
+ 83. B RebidIpo @ 1,504 qty 3 -> REFUSED INSUFFICIENT_BALANCE; free 212
+ 84. B RebidIpo @ 1,792 -> REFUSED INSUFFICIENT_BALANCE; free 212
+ 85. B RebidIpo @ 1,503 -> REFUSED IPO_PRICE_TAKEN; free 212
+     core book: A: 40@2,000; B: 7@1,773,94@1,583,25@1,543; C: 47@1,680; D: 146@1,503; OUT1: 48@1,732,25@1,645,52@1,588; OUT2: 36@1,689,52@1,632,31@1,612,3@1,522,43@1,510; OUT3: 9@1,542,18@1,524   [676 slots, lowest 1,503]
+     A books: {'free': 0, 'atRisk': 80000, 'listed(books)': {2000: 40}, 'actual(core book)': {2000: 40}}
+     B books: {'free': 212, 'atRisk': 199788, 'listed(books)': {1543: 25, 1583: 94, 1773: 7}, 'actual(core book)': {1543: 25, 1583: 94, 1773: 7}}
+     C books: {'free': 1040, 'atRisk': 78960, 'listed(books)': {1680: 47}, 'actual(core book)': {1680: 47}}
+     D books: {'free': 903, 'atRisk': 299097, 'listed(books)': {1503: 199}, 'actual(core book)': {1503: 146}}
+
+END OF EPOCH: final price 1,503
+  A: {'seats': 40, 'shares': 40, 'costBasis': 60120, 'returned': 19880}
+  B: {'seats': 126, 'shares': 126, 'costBasis': 189378, 'returned': 10622}
+  C: {'seats': 47, 'shares': 47, 'costBasis': 70641, 'returned': 9359}
+  D: {'seats': 146, 'shares': 146, 'costBasis': 219438, 'returned': 80562}
+  OUT1: {'seats': 125, 'shares': 125, 'spent': 187875, 'returned': 18962}
+  OUT2: {'seats': 165, 'shares': 165, 'spent': 247995, 'returned': 17141}
+  OUT3: {'seats': 27, 'shares': 27, 'spent': 40581, 'returned': 729}
+  check: pools' costBasis + returned = 660,000 = total budgets 660,000

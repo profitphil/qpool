@@ -1,0 +1,30 @@
+  1. A Execute: budget 200,000 at opening 2,000 -> 100 seats, free 0
+  2. B Execute: budget 150,000 at opening 1,500 -> 100 seats, free 0
+  3. C Execute: budget 120,000 at opening 1,200 -> 100 seats, free 0
+  4. D Execute: budget 90,000 at opening 900 -> 100 seats, free 0
+  5. OUT1 bids 276 @ 1,800 -> refunds in the same transaction: no seat pushed out
+  6. OUT2 bids 100 @ 1,000 -> refunds in the same transaction: D +90,000
+  7. D RebidIpo @ 1,000 -> REFUSED PRICE_TOO_LOW; free 0
+  8. D RebidIpo @ 1,001 -> OK, 89 seats (cost 89,089); pushed out: OUT2 +89,000; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 911
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; D: 89@1,001; OUT1: 276@1,800; OUT2: 11@1,000   [676 slots, lowest 1,000]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 911, 'atRisk': 89089, 'listed(books)': {1001: 89}, 'actual(core book)': {1001: 89}}
+  9. OUT2 bids 100 @ 1,100 -> refunds in the same transaction: D +89,089; own unregistered units back 11,000
+ 10. D RebidIpo @ 1,101 -> OK, 81 seats (cost 89,181); pushed out: OUT2 +89,100; own seats pushed out refund 0 (freed at the NEXT reconcile); free now 819
+ 11. D RebidIpo @ 1,101 -> REFUSED INSUFFICIENT_BALANCE; free 819
+     core book: A: 100@2,000; B: 100@1,500; C: 100@1,200; D: 81@1,101; OUT1: 276@1,800; OUT2: 19@1,100   [676 slots, lowest 1,100]
+     A books: {'free': 0, 'atRisk': 200000, 'listed(books)': {2000: 100}, 'actual(core book)': {2000: 100}}
+     B books: {'free': 0, 'atRisk': 150000, 'listed(books)': {1500: 100}, 'actual(core book)': {1500: 100}}
+     C books: {'free': 0, 'atRisk': 120000, 'listed(books)': {1200: 100}, 'actual(core book)': {1200: 100}}
+     D books: {'free': 819, 'atRisk': 89181, 'listed(books)': {1101: 81}, 'actual(core book)': {1101: 81}}
+
+END OF EPOCH: final price 1,100
+  A: {'seats': 100, 'shares': 100, 'costBasis': 110000, 'returned': 90000}
+  B: {'seats': 100, 'shares': 100, 'costBasis': 110000, 'returned': 40000}
+  C: {'seats': 100, 'shares': 100, 'costBasis': 110000, 'returned': 10000}
+  D: {'seats': 81, 'shares': 81, 'costBasis': 89100, 'returned': 900}
+  OUT1: {'seats': 276, 'shares': 276, 'spent': 303600, 'returned': 193200}
+  OUT2: {'seats': 19, 'shares': 19, 'spent': 20900, 'returned': 0}
+  check: pools' costBasis + returned = 560,000 = total budgets 560,000

@@ -1,0 +1,3 @@
+W2: run W1's chain state, then settle the holdings in several different orders; every order must give the
+per-member results printed at the end of W1 (shares = seats, costBasis = shares x final price, rest returned).
+Use mirrored targets (same war, opposite settle orders) when the chain allows only one order per run.
