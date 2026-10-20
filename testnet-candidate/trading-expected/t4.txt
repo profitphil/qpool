@@ -1,0 +1,7 @@
+QSWAP PARAM: swapFeeRate 30 bps in this example (read it from QSWAP); reserves 1,000,000 QU / 10,000 tokens (price about 100)
+A BUY_QSWAP 100,000 QU -> 906 tokens (average 110.375 QU per token); pool price before 100.000, after 120.959; reserves 1,100,000 / 9,094
+B BUY_QSWAP 100,000 QU -> 755 tokens (average 132.450 QU per token); pool price before 120.959, after 143.902; reserves 1,200,000 / 8,339
+C BUY_QSWAP 100,000 QU -> 639 tokens (average 156.495 QU per token); pool price before 143.902, after 168.831; reserves 1,300,000 / 7,700
+The same three buys with min-out set to the FIRST quote: B and C must fail their bound (the price moved against them) and get their QU back
+D SELL_QSWAP 800 tokens -> QSWAP pays 122,020 QU; minus the flat fee 100,000 -> credited 22,020 to the holding's members by cost (management fee 1 percent = 220)
+Propose must refuse a SELL_QSWAP whose minimum proceeds are at or below 100,100. Use QSWAP's quote functions as the oracle on the testnet.

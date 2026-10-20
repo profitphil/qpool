@@ -1,0 +1,20 @@
+1) token issuer ISSUER1 pays 100,000: payer sends 100,000; management fee 1,000 to revenue; net 99,000; recognised shares 400
+    A: 100 shares -> 24,750.0000 (exact 24750); members by cost: A1 14,850 (exact 14,850.0000), A2 7,425 (exact 7,425.0000), A3 2,475 (exact 2,475.0000)
+    B: 300 shares -> 74,250.0000 (exact 74250); members by cost: B1 74,250 (exact 74,250.0000)
+2) A1 sells 50 percent of his seat (cost units 30) to A4 at ANY price: the next dividend splits A's part by the new costs
+   ISSUER1 pays 10,001: payer sends 10,001; management fee 100 to revenue; net 9,901; recognised shares 400
+    A: 100 shares -> 2,475.2500 (exact 9901/4); members by cost: A1 742 (exact 742.5750), A2 742 (exact 742.5750), A3 247 (exact 247.5250), A4 742 (exact 742.5750)
+    B: 300 shares -> 7,425.7500 (exact 29703/4); members by cost: B1 7,425 (exact 7,425.7500)
+3) pool B sells 100 of its 300 shares on QX: recognised shares fall to 200; B's members' costs stay
+   ISSUER1 pays 90,000: payer sends 90,000; management fee 900 to revenue; net 89,100; recognised shares 300
+    A: 100 shares -> 29,700.0000 (exact 29700); members by cost: A1 8,910 (exact 8,910.0000), A2 8,910 (exact 8,910.0000), A3 2,970 (exact 2,970.0000), A4 8,910 (exact 8,910.0000)
+    B: 200 shares -> 59,400.0000 (exact 59400); members by cost: B1 59,400 (exact 59,400.0000)
+4) a third pool C buys 200 shares on QX: it earns only dividends paid AFTER its shares are recognised
+   ISSUER1 pays 50,000: payer sends 50,000; management fee 500 to revenue; net 49,500; recognised shares 500
+    A: 100 shares -> 9,900.0000 (exact 9900); members by cost: A1 2,970 (exact 2,970.0000), A2 2,970 (exact 2,970.0000), A3 990 (exact 990.0000), A4 2,970 (exact 2,970.0000)
+    B: 200 shares -> 19,800.0000 (exact 19800); members by cost: B1 19,800 (exact 19,800.0000)
+    C: 200 shares -> 19,800.0000 (exact 19800); members by cost: C1 9,900 (exact 9,900.0000), C2 9,900 (exact 9,900.0000)
+5) 1 QU dividends: each pays fee floor(1 x 10/1000) = 0 and credits 1 QU through a fixed-point accumulator; the sum of all claims
+   over 1,000 such payments must never exceed 1,000 QU, and each member's rounding error stays below 1 QU
+6) a contract pays by qpiDistributeDividends: payer sends perShare x 676; QPOOL's ledger for that contract receives only the
+   shares QPOOL holds: for example perShare 150 and QPOOL holds 300 shares of it -> 45,000 arrives, fee 450, net 44,550

@@ -1,0 +1,41 @@
+user,role,pools
+U01,creator of pool P1,P1
+U02,creator of pool P2,P2
+U03,creator of pool P3,P3
+U04,creator of pool P4,P4
+U05,creator of pool P5,P5
+U06,creator of pool P6,P6
+U07,creator of pool P7,P7
+U08,creator of pool P8,P8
+U09,member (in 1 to 3 pools),"P1,P2"
+U10,member (in 1 to 3 pools),"P1,P2"
+U11,member (in 1 to 3 pools),"P1,P3"
+U12,member (in 1 to 3 pools),"P1,P4"
+U13,member (in 1 to 3 pools),"P1,P5"
+U14,member (in 1 to 3 pools),"P1,P6"
+U15,member (in 1 to 3 pools),"P1,P6"
+U16,member (in 1 to 3 pools),"P2,P6"
+U17,member (in 1 to 3 pools),"P2,P7"
+U18,member (in 1 to 3 pools),"P2,P8"
+U19,member (in 1 to 3 pools),P2
+U20,member (in 1 to 3 pools),P2
+U21,member (in 1 to 3 pools),"P3,P5"
+U22,member (in 1 to 3 pools),"P3,P6"
+U23,member (in 1 to 3 pools),"P3,P7"
+U24,member (in 1 to 3 pools),"P3,P8"
+U25,member (in 1 to 3 pools),"P4,P6"
+U26,member (in 1 to 3 pools),"P4,P7"
+U27,member (in 1 to 3 pools),"P4,P8"
+U28,member (in 1 to 3 pools),"P4,P8"
+U29,member (in 1 to 3 pools),"P5,P6"
+U30,member (in 1 to 3 pools),"P5,P6,P7"
+U31,market maker MM1 (sells TOK1 on QX),
+U32,market maker MM2 (sells TOK2 on QX),
+U33,"market maker MM3 (QX bids, QPAY asks)",
+U34,LP: QSWAP liquidity TOK1/QU,
+U35,"ISSUER1: issues TOK1, pays dividends",
+U36,"ISSUER2: issues TOK2, pays dividends",
+U37,OUT1: IPO outsider and trader,
+U38,OUT2: IPO outsider and sniper,
+U39,OUT3: IPO outsider,
+U40,"KEEPER and ATTACKER (non-member, permissionless calls, hostile inputs)",
