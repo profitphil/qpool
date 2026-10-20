@@ -1,0 +1,7 @@
+QX tradeFee = 3,000,000 billionths (0.3 percent)
+QX bids (MM): 150@1,100  100@1,090  100@1,070
+A SELL_QX limit 1,090 x 120: fills 120@1,100; gross 132,000, QX trade fee 397, hand-over 0; received 131,603; management fee 1,316; credited 130,287 by cost -> A1 78,172, A2 52,114; unsold 0 cancelled; holding now 0 shares
+B SELL_QX limit 1,085 x 90: fills 30@1,100, 60@1,090; gross 98,400, QX trade fee 297, hand-over 0; received 98,103; management fee 981; credited 97,122 by cost -> B1 97,122; unsold 0 cancelled; holding now 0 shares
+C SELL_QX limit 1,080 x 140: fills 40@1,090; gross 43,600, QX trade fee 131, hand-over 0; received 43,469; management fee 434; credited 43,035 by cost -> C1 25,103, C2 10,758, C3 7,172; unsold 100 cancelled; holding now 100 shares
+bids left: 100@1,070
+Variation: repeat with deposited shares (hand-over PARAM 100 or 200) and with a limit above every bid (nothing sells, shares kept)

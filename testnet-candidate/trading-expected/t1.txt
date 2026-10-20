@@ -1,0 +1,13 @@
+QX tradeFee = 3,000,000 billionths (0.3 percent, as stated by the owner); confirm with QX.Fees on the testnet
+QX asks (market maker MM): 100@1,000  100@1,010  100@1,020  200@1,050
+A BUY_QX limit 1,000 x 100 with budget 100,000: bid quantity 100; fills 100@1,000; spent 100,000; refunds 0 (excess 0 + price improvement 0); resting 0 shares reserving 0; holding 100 shares + 0 pending; costBasis 100,000
+B BUY_QX limit 1,015 x 100 with budget 100,000: bid quantity 98; fills 98@1,010; spent 98,980; refunds 1,020 (excess 530 + price improvement 490); resting 0 shares reserving 0; holding 98 shares + 0 pending; costBasis 98,980
+C BUY_QX limit 1,050 x 150 with budget 150,000: bid quantity 142; fills 2@1,010, 100@1,020, 40@1,050; spent 146,020; refunds 3,980 (excess 900 + price improvement 3,080); resting 0 shares reserving 0; holding 142 shares + 0 pending; costBasis 146,020
+D BUY_QX limit 1,050 x 150 with budget 150,000: bid quantity 142; fills 142@1,050; spent 149,100; refunds 900 (excess 900 + price improvement 0); resting 0 shares reserving 0; holding 142 shares + 0 pending; costBasis 149,100
+asks left: 18@1,050; resting bids: 
+--- second round: asks are gone; A and C bid again below the market, then MM sells into their resting bids
+A and C members top up their uncommitted (A +50,000, C +40,000) before the second proposals
+A BUY_QX limit 990 x 50 with budget 49,500: bid quantity 50; fills none; spent 0; refunds 0 (excess 0 + price improvement 0); resting 50 shares reserving 49,500; holding 100 shares + 50 pending; costBasis 149,500
+C BUY_QX limit 995 x 40 with budget 39,800: bid quantity 40; fills none; spent 0; refunds 0 (excess 0 + price improvement 0); resting 40 shares reserving 39,800; holding 142 shares + 40 pending; costBasis 185,820
+MM sells 90 limit 990: C 40@995 (fee 120), A 50@990 (fee 149); unsold 0
+Expected for the pools: after the later fills A and C hold their shares only once ReconcileHolding has run (pendingShares -> shares)

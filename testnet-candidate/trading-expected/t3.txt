@@ -1,0 +1,6 @@
+A BUY_QX limit 1,050 x 100 with budget 105,000: bid quantity 100; fills 40@1,050; spent 42,000; refunds 0 (excess 0 + price improvement 0); resting 60 shares reserving 63,000; holding 40 shares + 60 pending; costBasis 105,000
+MM later sells 60 into the resting bid at 1,050: fill price 1,050 = the pool's bid price, so no refund
+    fills: 60@1,050
+Before ReconcileHolding the universe holds 100 shares but the ledger recognises 40: the shares of the unreconciled bid are
+not recognised yet. A dividend of 10,000 arriving now: fee 100, net 9,900; the unrecognised part (pending 60 of 100) is
+set aside: credited now = 9,900 x 40/100 = 3,960; escrow 5,940, paid to the holding when ReconcileHolding recognises the fills.
