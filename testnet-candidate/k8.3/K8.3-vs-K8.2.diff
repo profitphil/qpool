@@ -1,0 +1,1102 @@
+--- final82/QPool-K8.2.h	2026-10-22 06:07:57
++++ final83/QPool-K8.3.h	2026-10-22 08:40:32
+@@ -406,6 +406,14 @@
+ // powers of two.
+ constexpr uint64 QPOOL_MAX_QX_BIDS_PER_LEDGER = 8;
+ static_assert((QPOOL_MAX_QX_BIDS_PER_LEDGER & (QPOOL_MAX_QX_BIDS_PER_LEDGER - 1)) == 0);
++// K8.3: a ledger lists resting bids OR resting asks (SourceLedger::qxSide): shares that arrive and shares that leave could not be told apart if both were open at once.
++constexpr uint64 QPOOL_QX_SIDE_BID = 1;
++constexpr uint64 QPOOL_QX_SIDE_ASK = 2;
++// K8.3: how many sell orders QPOOL may have resting on QX in all, over every ledger. QPOOL reads its asks from QX's EntityAskOrders, a window of 256 orders, so the
++// count must stay below it (an immediate SELL_QX adds one for the length of its own call).
++constexpr uint64 QPOOL_MAX_RESTING_ASKS = 128;
++// The same for resting BIDS (QPOOL reads its bids from QX's EntityBidOrders, also a window of 256 orders). A read that fills the whole window is refused as unreadable.
++constexpr uint64 QPOOL_MAX_RESTING_BIDS = 128;
+ // qpi.tick() is a 32-bit number; a tick stored in a record is clamped to it (an expiry cannot pass the last tick there is).
+ constexpr uint64 QPOOL_TICK_LIMIT        = 0xFFFFFFFFULL;
+ 
+@@ -503,6 +511,7 @@
+ constexpr uint64 QPOOL_KIND_SELL_QSWAP  = 4; // atomic swap asset -> QU
+ constexpr uint64 QPOOL_KIND_SELL_QX     = 5; // sell now on QX: limit ask matched in the call, unfilled rest cancelled
+ constexpr uint64 QPOOL_KIND_ALLOCATE    = 6; // assign unattributed QU to a holding
++constexpr uint64 QPOOL_KIND_SELL_QX_LIMIT = 7; // K8.3: sell on QX at a limit price: what the visible bids pay fills at once, the rest RESTS on QX (CancelQxAsk takes it back)
+ 
+ // ---- Proposal status ----
+ constexpr uint64 QPOOL_PROP_OPEN      = 0;
+@@ -559,6 +568,8 @@
+ constexpr uint32 QPOOL_ERR_NOTHING_TO_BUY = 39;      // BuyAndBurnQpay: no QPAY is on offer at or below the ceiling (or the pot is empty); nothing was written
+ constexpr uint32 QPOOL_ERR_NO_PENDING_BID = 40;      // CancelQxBid: the holding has no QX bid resting (none was placed, or every share of it has filled); nothing was written
+ constexpr uint32 QPOOL_ERR_NAME_PENDING = 41;        // the share name of this contract index is not verified: the registry has no (index, name) pair for it (SettleIpo: BEGIN_EPOCH has not paired the IPO's name yet, retry after the next epoch start; a purchase or deposit above the embedded table: the name is not paired to this index, or never could be); nothing was written
++constexpr uint32 QPOOL_ERR_QX_SIDE_BUSY = 42;        // K8.3: this ledger lists resting orders of the other side (a BUY_QX cannot join resting asks, a resting sell cannot join resting bids)
++constexpr uint32 QPOOL_ERR_NO_PENDING_ASK = 43;      // CancelQxAsk: the holding has no sell resting on QX (none was placed, or every share of it has sold); nothing was written
+ 
+ // ---- Dividend source kinds ----
+ constexpr uint64 QPOOL_SOURCE_TOKEN    = 0; // QU sent by the asset's issuer (standardTransaction / qpiTransfer)
+@@ -764,6 +775,10 @@
+         // Dividends the hook set aside for the fills of THIS bid that are not recognised yet (the ledger's escrow is the sum over its bids); ApplyHolding pays them
+         // to the holding when the fills are credited.
+         uint64 qxEscrow;
++        // K8.3: shares of this holding that sit on a resting QX sell order (they are NOT in `shares` and not in the ledger's recognised total; they still sit in QPOOL's
++        // possession until a buyer takes them). qxBidPrice / qxBidTick / qxSeq / qxEscrow describe that order too (the field names are those of K8.2's bids). Works for
++        // IPO holdings as well (their pendingShares is a seat count and is not used for this).
++        uint64 askShares;
+     };
+ 
+     struct OwnKey
+@@ -814,6 +829,10 @@
+         // order (see QxWaterfall). pendingQx is the sum of their pendingShares. A bid leaves the list where its holding's pendingShares reaches 0 (ApplyHolding).
+         uint64 qxCount;
+         Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> qxHold;
++        // K8.3: which side the listed orders are on (QPOOL_QX_SIDE_*: 0 none, 1 bids, 2 asks). For asks qxHold lists the holdings in the order QX sells them (lowest price
++        // first and, within one price, the order placed first) and askTotal is the sum of their askShares: the shares of resting asks still to sell.
++        uint64 qxSide;
++        uint64 askTotal;
+         uint64 bindEpoch;    // qpi.epoch() when the ledger was created: how long a binding that never paid has stood (EvictSquat)
+     };
+ 
+@@ -1023,6 +1042,12 @@
+ 
+         // ---- K8.2: the order number of the next resting QX bid (see Holding::qxSeq); appended, so no field above moves ----
+         uint64 qxSeq;
++
++        // ---- K8.3: the resting sell orders QPOOL has on QX, over every ledger (QPOOL_MAX_RESTING_ASKS); appended, so no field above moves ----
++        uint64 restingAsks;
++
++        // ---- K8.3: the resting BIDS of QPOOL on QX, over every ledger (QPOOL_MAX_RESTING_BIDS) ----
++        uint64 restingBids;
+     };
+ 
+     // ======================== I/O structs ========================
+@@ -1129,6 +1154,7 @@
+     {
+         uint32 found; uint64 assetName; uint64 holdings; uint64 recognized; uint64 unsettled;
+         uint64 escrow; uint64 pendingQx; uint64 accHigh; uint64 accLow;
++        uint64 qxCount; uint64 qxSide; uint64 askTotal;     // K8.3 (appended): resting orders listed, their side (1 bids, 2 asks), the shares still to sell on the asks
+     };
+     struct GetSource_locals { SourceKey key; SourceLedger led; };
+ 
+@@ -1225,12 +1251,25 @@
+     };
+ 
+     // How many shares of `asset` QPOOL still has resting on an ask at `price` on QX (a read of QX).
++    // K8.3: `total` is what QPOOL has resting on asks of the asset at ALL prices (the shares QX holds back from other uses: AddToAskOrder and TransferShareManagementRights
++    // only take shares that no ask has reserved).
+     struct QxAskRest_input { Asset asset; uint64 price; };
+-    struct QxAskRest_output { uint32 returnCode; uint64 rest; };
++    struct QxAskRest_output { uint32 returnCode; uint64 rest; uint64 total; };
+     struct QxAskRest_locals
+     {
+         QX::EntityAskOrders_input aIn; QX::EntityAskOrders_output aOut;
+         QX::EntityAskOrders_output::Order o;
++        uint64 i;
++    };
++
++    // The mirror for BIDS: how many shares of `asset` QX still lists on QPOOL's resting bids (`rest` at `price`, `total` at all prices). QX is the authority for what has filled.
++    // A read that fills the whole 256-order window cannot be trusted (orders beyond it would look filled) and is reported as EXTERNAL_CALL.
++    struct QxBidRest_input { Asset asset; uint64 price; };
++    struct QxBidRest_output { uint32 returnCode; uint64 rest; uint64 total; };
++    struct QxBidRest_locals
++    {
++        QX::EntityBidOrders_input bIn; QX::EntityBidOrders_output bOut;
++        QX::EntityBidOrders_output::Order o;
+         uint64 i;
+     };
+ 
+@@ -1272,6 +1311,14 @@
+     struct QxWaterfall_input { SourceLedger led; uint64 unrec; };
+     struct QxWaterfall_output { Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> alloc; };
+     struct QxWaterfall_locals { Holding o; uint64 i; uint64 left; uint64 take; };
++    // K8.3 (declared here, defined after NoteQxBid)
++    struct ApplyAsk_input { uint64 holdingId; uint64 newAsk; uint64 price; };
++    struct ApplyAsk_output { uint32 unused; };
++    struct ApplyAsk_locals
++    {
++        Holding h; Holding o; SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
++        uint64 old; uint64 pos; uint64 i; uint64 j; uint64 found;
++    };
+     struct ReconcileLedgerQx_input { Asset asset; uint64 payerIndex; uint64 useUnrec; uint64 unrec; };
+     struct ReconcileLedgerQx_output { uint32 unused; };
+     struct ReconcileLedgerQx_locals
+@@ -1281,13 +1328,21 @@
+         ApplyHolding_input apIn; ApplyHolding_output apOut;
+         Holding o; Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> ids; Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> al;
+         uint64 n; uint64 i; sint64 held; uint64 u;
++        // K8.3 (asks)
++        Holding o2; ApplyAsk_input aaIn; ApplyAsk_output aaOut; CreditProceeds_input crIn; CreditProceeds_output crOut;
++        QX::Fees_input fIn; QX::Fees_output fOut;
++        Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> gross; Array<uint64, QPOOL_MAX_QX_BIDS_PER_LEDGER> give;
++        uint64 tradeFee; uint64 lv; uint64 j; uint64 lg; uint64 lfee; uint64 lnet; uint64 lgiven; uint64 lfirst; uint64 lfirstSet; uint64 part; uint64 endLevel;
++        uint64 potLeft; uint64 takeFromPot; uint64 hid; uint64 lu;
++        QxAskRest_input restIn; QxAskRest_output restOut; QxBidRest_input restBid; QxBidRest_output restBidOut;
+     };
+ 
+ 
+     // The escrow of the ledger a holding earns from (0 when it has none), read without syncing.
+-    struct HoldingEscrow_input { Asset asset; uint64 ipoContractIndex; uint64 payerIndex; };
++    // forSale (K8.3): 1 when the caller is a SALE of shares (the escrow earmarked for resting asks is not in its way), 0 for a seat trade (the escrow earmarked for the traded holding itself counts; holdingId names it).
++    struct HoldingEscrow_input { Asset asset; uint64 ipoContractIndex; uint64 payerIndex; uint64 forSale; uint64 holdingId; };
+     struct HoldingEscrow_output { uint64 escrow; };
+-    struct HoldingEscrow_locals { SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led; };
++    struct HoldingEscrow_locals { SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led; Holding o; uint64 i; uint64 earmarked; };
+ 
+     // ---- roster membership (private) ----
+     // A member is on a pool's roster exactly when he has a Contribution record in that pool: ONE fact
+@@ -1452,12 +1507,14 @@
+         QX::AddToAskOrder_input qxAskIn; QX::AddToAskOrder_output qxAskOut;
+         QX::RemoveFromAskOrder_input qxRemIn; QX::RemoveFromAskOrder_output qxRemOut;
+         QxBidBook_input bookIn; QxBidBook_output bookOut;
+-        QxAskRest_input restIn; QxAskRest_output restOut;
++        QxAskRest_input restIn; QxAskRest_output restOut; QxBidRest_input restBid; QxBidRest_output restBidOut;
+         CreditProceeds_input crIn; CreditProceeds_output crOut;
+         UnparkArrivals_input unpIn; UnparkArrivals_output unpOut;
+         sint64 managedQx; sint64 heldQxBefore; sint64 heldQxAfter;
+         uint64 fromSelf; uint64 fromQswap; uint64 costs; uint64 rest; uint64 gaBefore; uint64 parked;
+         uint64 placed; uint64 cancelFailed; uint64 askShares; uint64 soldByHeld; uint32 code;
++        // K8.3: SELL_QX_LIMIT (resting), the part that stays on QX, QX's resting asks before the call (at the limit price / at all prices), the ask's record
++        uint64 resting; uint64 keep; uint64 restBeforeP; uint64 reservedAll; uint64 ledIdx; ApplyAsk_input aaIn; ApplyAsk_output aaOut;
+         IpoPriceKey ipoKey; uint64 overspent;
+         // BUY_IPO: the target's row in StateData::ipoTargets (see IpoRowOf) and the holding's bid list.
+         IpoRowOf_input rowIn; IpoRowOf_output rowOut; IpoTarget row; uint64 rowIdx; IpoBids bids;
+@@ -1509,7 +1566,7 @@
+     };
+ 
+     struct ReconcileHolding_input { uint64 holdingId; };
+-    struct ReconcileHolding_output { uint32 returnCode; uint64 shares; uint64 pendingShares; };
++    struct ReconcileHolding_output { uint32 returnCode; uint64 shares; uint64 pendingShares; uint64 askShares; };
+     struct ReconcileHolding_locals
+     {
+         Holding h; sint64 held;
+@@ -1656,7 +1713,8 @@
+         uint64 ipoSettled; uint64 sourceEscrow;
+         uint64 payerIndex;
+         uint64 rows;      // seat rows that exist for the holding
+-        uint64 qxBidPrice; uint64 qxBidTick;   // the QX bid this holding has resting (pendingShares > 0): its limit price and the tick it was placed at; 0 and 0 otherwise
++        uint64 qxBidPrice; uint64 qxBidTick;   // the QX order (bid, or since K8.3 sell) this holding has resting: its limit price and the tick it was placed at; 0 and 0 otherwise
++        uint64 askShares;                       // K8.3 (appended): shares of this holding on a resting QX sell
+     };
+     struct GetHolding_locals
+     {
+@@ -1671,6 +1729,7 @@
+         uint64 offeredCostUnits; uint64 askPrice;
+         uint64 offeredShares;       // the holding's LIVE shares while an offer exists (0 without one): the value BuyPosition's expectedShares must carry
+         uint64 voteLockUntilTick;   // the seat cannot be offered or sold while qpi.tick() <= this (0 or a past tick: free)
++        uint64 holdingAskShares;    // K8.3 (appended): shares of the holding on a resting QX sell (they are not in offeredShares)
+     };
+     struct GetPosition_locals
+     {
+@@ -1705,6 +1764,8 @@
+         // last BEGIN_EPOCH (autoSettleEpoch, 0 = none yet) either hit its bound (autoSettleDone + autoSettleSkipped == QPOOL_AUTO_SETTLE_MAX) or skipped holdings
+         // (autoSettleSkipped above 0: nothing was written for them, SettleIpo returns the reason). autoSettleTotal: settled by BEGIN_EPOCH passes, in all.
+         uint64 readyUnsettled; uint64 autoSettleEpoch; uint64 autoSettleDone; uint64 autoSettleSkipped; uint64 autoSettleTotal;
++        uint64 restingAsks;      // K8.3 (appended): holdings that rest a sell on QX, over every ledger (at most QPOOL_MAX_RESTING_ASKS)
++        uint64 restingBids;      // K8.3 (appended): holdings that rest a bid on QX, over every ledger (at most QPOOL_MAX_RESTING_BIDS)
+     };
+     struct GetStats_locals { IpoTarget row; uint64 t; };
+ 
+@@ -1997,6 +2058,15 @@
+             {
+                 output.returnCode = QPOOL_ERR_QX_BID_PENDING; return;
+             }
++            if (input.qxBid != 0 && state.get().restingBids >= QPOOL_MAX_RESTING_BIDS)
++            {
++                output.returnCode = QPOOL_ERR_CAPACITY; return;
++            }
++            // K8.3: not while the ledger lists resting asks.
++            if (input.qxBid != 0 && locals.led.qxCount > 0 && locals.led.qxSide == QPOOL_QX_SIDE_ASK)
++            {
++                output.returnCode = QPOOL_ERR_QX_SIDE_BUSY; return;
++            }
+             return;
+         }
+         if (state.get().sources.population() >= QPOOL_SOURCE_SOFT_CAP)
+@@ -2181,7 +2251,7 @@
+                 ? locals.led.pendingQx - output.h.pendingShares : 0;
+             locals.led.pendingQx = sadd(locals.led.pendingQx, input.newPending);
+             // K8.2: a bid whose holding has nothing pending any more (filled, cancelled, or the holding retires) leaves the ledger's list, and its record goes.
+-            if ((input.newPending == 0 || input.retire != 0) && locals.led.qxCount > 0)
++            if ((input.newPending == 0 || input.retire != 0) && locals.led.qxCount > 0 && locals.led.qxSide != QPOOL_QX_SIDE_ASK)
+             {
+                 locals.qj = 0;
+                 locals.qfound = 0;
+@@ -2194,9 +2264,11 @@
+                 {
+                     locals.led.qxCount = locals.qj;
+                     locals.led.qxHold.set(locals.qj, 0);
++                    if (locals.led.qxCount == 0) locals.led.qxSide = 0;
++                    if (state.get().restingBids > 0) state.mut().restingBids = state.get().restingBids - 1;
+                 }
+             }
+-            if (input.newPending == 0 || input.retire != 0)
++            if ((input.newPending == 0 || input.retire != 0) && output.h.askShares == 0)
+             {
+                 output.h.qxBidPrice = 0;
+                 output.h.qxBidTick = 0;
+@@ -2361,6 +2433,7 @@
+     {
+         output.returnCode = QPOOL_OK;
+         output.rest = 0;
++        output.total = 0;
+         locals.aIn.entity = SELF;
+         locals.aIn.offset = 0;
+         CALL_OTHER_CONTRACT_FUNCTION_E(QX, EntityAskOrders, locals.aIn, locals.aOut, askErr);
+@@ -2369,14 +2442,37 @@
+         {
+             locals.o = locals.aOut.orders.get(locals.i);
+             if (locals.o.numberOfShares <= 0) break;
+-            if (locals.o.issuer == input.asset.issuer && locals.o.assetName == input.asset.assetName
+-                && locals.o.price == (sint64)input.price)
++            if (locals.o.issuer == input.asset.issuer && locals.o.assetName == input.asset.assetName)
+             {
+-                output.rest = sadd(output.rest, (uint64)locals.o.numberOfShares);
++                output.total = sadd(output.total, (uint64)locals.o.numberOfShares);
++                if (locals.o.price == (sint64)input.price) output.rest = sadd(output.rest, (uint64)locals.o.numberOfShares);
+             }
+         }
++        if (locals.i >= locals.aOut.orders.capacity()) output.returnCode = QPOOL_ERR_EXTERNAL_CALL;      // (K8.3) a full window cannot be trusted
+     }
+ 
++    PRIVATE_FUNCTION_WITH_LOCALS(QxBidRest)
++    {
++        output.returnCode = QPOOL_OK;
++        output.rest = 0;
++        output.total = 0;
++        locals.bIn.entity = SELF;
++        locals.bIn.offset = 0;
++        CALL_OTHER_CONTRACT_FUNCTION_E(QX, EntityBidOrders, locals.bIn, locals.bOut, bidErr);
++        if (bidErr != NoCallError) { output.returnCode = QPOOL_ERR_EXTERNAL_CALL; return; }
++        for (locals.i = 0; locals.i < locals.bOut.orders.capacity(); locals.i++)
++        {
++            locals.o = locals.bOut.orders.get(locals.i);
++            if (locals.o.numberOfShares <= 0) break;
++            if (locals.o.issuer == input.asset.issuer && locals.o.assetName == input.asset.assetName)
++            {
++                output.total = sadd(output.total, (uint64)locals.o.numberOfShares);
++                if (locals.o.price == (sint64)input.price) output.rest = sadd(output.rest, (uint64)locals.o.numberOfShares);
++            }
++        }
++        if (locals.i >= locals.bOut.orders.capacity()) output.returnCode = QPOOL_ERR_EXTERNAL_CALL;
++    }
++
+     // Credit what a sale brought in to the ONE holding that sold it. The management fee comes off
+     // first, then the rest rides the same accumulator as dividends; costBasis is untouched, so
+     // every member's fraction is preserved. Call AFTER ApplyHolding (which syncs the holding and
+@@ -2476,9 +2572,99 @@
+         }
+         locals.led.qxHold.set(locals.pos, input.holdingId);
+         locals.led.qxCount = locals.led.qxCount + 1;
++        locals.led.qxSide = QPOOL_QX_SIDE_BID;
++        state.mut().restingBids = sadd(state.get().restingBids, 1ULL);
+         state.mut().sources.set(locals.kout.key, locals.led);
+     }
+ 
++    // K8.3: record that a holding's resting sell has changed to `newAsk` shares. 0 -> n places it (limit `price`, the tick, the next order number) and lists it in the
++    // ledger's priority order for asks: after every ask whose price is at most this one, so the lowest price goes first and, at one price, the order placed first stays first.
++    // Fewer than before (some sold, or some taken back) lowers the ledger's askTotal; 0 removes it from the list and clears its order record. It moves NOTHING else: the
++    // holding's shares and the ledger's recognised total change in ApplyHolding, which the caller calls AFTER this (it may retire the holding and drop the ledger, so the
++    // list must be right by then) with the holding read again.
++    PRIVATE_PROCEDURE_WITH_LOCALS(ApplyAsk)
++    {
++        locals.h = state.get().holdings.get(input.holdingId);
++        locals.old = locals.h.askShares;
++        if (locals.old == input.newAsk) return;
++        locals.kin.asset = locals.h.asset;
++        locals.kin.ipoContractIndex = locals.h.ipoContractIndex;
++        locals.kin.payerIndex = locals.h.payerIndex;
++        CALL(SourceKeyOf, locals.kin, locals.kout);
++        if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led))
++        {
++            locals.h.askShares = input.newAsk;      // (only a hand-built holding in a test is in no ledger)
++            state.mut().holdings.set(input.holdingId, locals.h);
++            return;
++        }
++        if (locals.old == 0)
++        {
++            if (locals.led.qxCount >= QPOOL_MAX_QX_BIDS_PER_LEDGER) return;      // (the caller checked room)
++            state.mut().qxSeq = sadd(state.get().qxSeq, 1ULL);
++            locals.h.qxBidPrice = input.price;
++            locals.h.qxBidTick = (uint64)qpi.tick();
++            locals.h.qxSeq = state.get().qxSeq;
++            locals.h.qxEscrow = 0;
++            locals.h.askShares = input.newAsk;
++            locals.pos = 0;
++            for (locals.i = 0; locals.i < locals.led.qxCount; locals.i++)
++            {
++                locals.o = state.get().holdings.get(locals.led.qxHold.get(locals.i));
++                if (locals.o.qxBidPrice <= input.price) locals.pos = locals.i + 1;
++            }
++            for (locals.i = locals.led.qxCount; locals.i > locals.pos; locals.i--)
++            {
++                locals.led.qxHold.set(locals.i, locals.led.qxHold.get(locals.i - 1));
++            }
++            locals.led.qxHold.set(locals.pos, input.holdingId);
++            locals.led.qxCount = locals.led.qxCount + 1;
++            locals.led.qxSide = QPOOL_QX_SIDE_ASK;
++            locals.led.askTotal = sadd(locals.led.askTotal, input.newAsk);
++            state.mut().restingAsks = sadd(state.get().restingAsks, 1ULL);
++        }
++        else
++        {
++            locals.led.askTotal = (locals.led.askTotal > locals.old) ? locals.led.askTotal - locals.old : 0;
++            locals.led.askTotal = sadd(locals.led.askTotal, input.newAsk);
++            locals.h.askShares = input.newAsk;
++            if (input.newAsk == 0)
++            {
++                locals.j = 0;
++                locals.found = 0;
++                for (locals.i = 0; locals.i < locals.led.qxCount; locals.i++)
++                {
++                    if (locals.led.qxHold.get(locals.i) == input.holdingId) locals.found = 1;
++                    else { locals.led.qxHold.set(locals.j, locals.led.qxHold.get(locals.i)); locals.j = locals.j + 1; }
++                }
++                if (locals.found != 0)
++                {
++                    locals.led.qxCount = locals.j;
++                    locals.led.qxHold.set(locals.j, 0);
++                    if (state.get().restingAsks > 0) state.mut().restingAsks = state.get().restingAsks - 1;
++                    // The last resting sell of QPOOL is gone and every sale was credited before it (a cancel and a reconcile credit first): whatever is left in the
++                    // counter is the remainder of the fee bounds, which belongs to nobody. It is QPOOL revenue, like every arrival that belongs to nobody.
++                    if (state.get().restingAsks == 0 && state.get().globalUnattributed > 0)
++                    {
++                        state.mut().pendingRevenue = sadd(state.get().pendingRevenue, state.get().globalUnattributed);
++                        state.mut().totalRevenue = sadd(state.get().totalRevenue, state.get().globalUnattributed);
++                        state.mut().totalUnownedSwept = sadd(state.get().totalUnownedSwept, state.get().globalUnattributed);
++                        state.mut().globalUnattributed = 0;
++                    }
++                }
++                if (locals.led.qxCount == 0)
++                {
++                    locals.led.qxSide = 0;
++                    locals.led.askTotal = 0;
++                }
++                locals.h.qxBidPrice = 0;
++                locals.h.qxBidTick = 0;
++                locals.h.qxSeq = 0;
++            }
++        }
++        state.mut().sources.set(locals.kout.key, locals.led);
++        state.mut().holdings.set(input.holdingId, locals.h);
++    }
++
+     // Hand `unrec` silently arrived shares to the ledger's resting bids in priority order (K8.2). QX fills bids from the highest price down (its matching loop starts at
+     // the head of the bid queue), and QPOOL's own bids at one price are one merged QX order, which QPOOL serves in the order they were placed. So the first bid takes
+     // up to its pendingShares, the next takes what is left, and so on. alloc[i] belongs to qxHold[i]. Read-only.
+@@ -2491,6 +2677,7 @@
+             if (locals.left == 0) break;
+             locals.o = state.get().holdings.get(input.led.qxHold.get(locals.i));
+             locals.take = (locals.o.pendingShares < locals.left) ? locals.o.pendingShares : locals.left;
++            if (input.led.qxSide == QPOOL_QX_SIDE_ASK) locals.take = (locals.o.askShares < locals.left) ? locals.o.askShares : locals.left;      // K8.3
+             output.alloc.set(locals.i, locals.take);
+             locals.left = locals.left - locals.take;
+         }
+@@ -2509,15 +2696,144 @@
+         if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led)) return;
+         if (locals.led.qxCount == 0) return;
+         if (locals.kout.key.kind == QPOOL_SOURCE_CONTRACT && locals.led.unsettled != 0) return;
++        // K8.3: RESTING ASKS. The shares of the asks that are still to sell are those QX still lists for QPOOL on this asset; the rest of askTotal has been sold,
++        // silently. QX sells the lowest price first, so the sold shares are handed to the asks in the ledger's order (QxWaterfall). Their QU
++        // arrived in the same transactions and sits in globalUnattributed (the hook parks what QX pays outside QPOOL's own calls): each ask is credited
++        //     shares sold x its price, less QX's fee, taken from that counter and never more than it holds.
++        // QX's fee is floor(price x shares x tradeFee / 1e9) + 1 per FILL, and the number of fills is not visible (a fill that pays nothing never reaches the hook). The
++        // credit therefore uses an UPPER BOUND of the fee: floor(gross x tradeFee / 1e9) + (shares sold at the level), because every fill moves at least one share and a sum of
++        // floors is at most the floor of the sum. What a ledger is credited can then never exceed what its fills really paid in, whatever buyers do, so nothing is ever drawn
++        // from another ledger's proceeds in the shared counter. The price is that a seller is credited up to (shares - fills) QU less than QX paid him per level; that
++        // remainder stays in the counter and goes to QPOOL revenue when the last resting ask has gone (ApplyAsk). The credit goes through the same choke point as every
++        // sale (ApplyAsk first: the list must be right before ApplyHolding may retire a sold-out holding and drop its ledger).
++        if (locals.led.qxSide == QPOOL_QX_SIDE_ASK)
++        {
++            // How many shares of the listed asks have sold: what the asks were booked for less what QX still lists for QPOOL on this asset (QX is the authority; the
++            // universe's share count cannot be, a donation of a single share would make a sold ask look unsold for ever). A read that fails changes nothing.
++            locals.restIn.asset = input.asset;
++            locals.restIn.price = 0;
++            CALL(QxAskRest, locals.restIn, locals.restOut);
++            if (locals.restOut.returnCode != QPOOL_OK) return;
++            locals.u = (locals.led.askTotal > locals.restOut.total) ? locals.led.askTotal - locals.restOut.total : 0;
++            if (locals.u == 0) return;
++            CALL_OTHER_CONTRACT_FUNCTION_E(QX, Fees, locals.fIn, locals.fOut, feeErr);
++            if (feeErr != NoCallError) return;
++            locals.tradeFee = (uint64)locals.fOut.tradeFee;
++            locals.wIn.led = locals.led;
++            locals.wIn.unrec = locals.u;
++            CALL(QxWaterfall, locals.wIn, locals.wOut);
++            locals.n = locals.led.qxCount;
++            locals.ids = locals.led.qxHold;
++            locals.al = locals.wOut.alloc;
++            for (locals.i = 0; locals.i < locals.n && locals.i < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.i++)
++            {
++                locals.o = state.get().holdings.get(locals.ids.get(locals.i));
++                locals.gross.set(locals.i, smul(locals.al.get(locals.i), locals.o.qxBidPrice));
++                locals.give.set(locals.i, 0);
++            }
++            // per price level (the asks of one price are one order at QX): gross, one fee, the net shared out by gross, the rounding to the first
++            locals.lv = 0;
++            for (locals.i = 0; locals.i < locals.n && locals.i < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.i++)
++            {
++                locals.endLevel = 1;
++                if (locals.i + 1 < locals.n)
++                {
++                    locals.o = state.get().holdings.get(locals.ids.get(locals.i));
++                    locals.o2 = state.get().holdings.get(locals.ids.get(locals.i + 1));
++                    if (locals.o2.qxBidPrice == locals.o.qxBidPrice) locals.endLevel = 0;
++                }
++                if (locals.endLevel == 0) continue;
++                locals.lg = 0;
++                for (locals.j = locals.lv; locals.j <= locals.i; locals.j++) locals.lg = sadd(locals.lg, locals.gross.get(locals.j));
++                if (locals.lg > 0)
++                {
++                    locals.lu = 0;
++                    for (locals.j = locals.lv; locals.j <= locals.i; locals.j++) locals.lu = sadd(locals.lu, locals.al.get(locals.j));
++                    if (locals.tradeFee > 0 && locals.lg >= (uint64)div<sint64>(INT64_MAX, (sint64)locals.tradeFee))
++                    {
++                        locals.lfee = div(locals.lg, (uint64)div<sint64>(1000000000LL, (sint64)locals.tradeFee)) + locals.lu;      // QX's form above ~3e12 QU
++                    }
++                    else
++                    {
++                        locals.lfee = div((uint128)locals.lg * (uint128)locals.tradeFee, (uint128)1000000000ULL).low + locals.lu;
++                    }
++                    locals.lnet = (locals.lg > locals.lfee) ? locals.lg - locals.lfee : 0;
++                    locals.lgiven = 0;
++                    locals.lfirstSet = 0;
++                    for (locals.j = locals.lv; locals.j <= locals.i; locals.j++)
++                    {
++                        if (locals.gross.get(locals.j) == 0) continue;
++                        locals.part = div((uint128)locals.lnet * (uint128)locals.gross.get(locals.j), (uint128)locals.lg).low;
++                        locals.give.set(locals.j, locals.part);
++                        locals.lgiven = locals.lgiven + locals.part;
++                        if (locals.lfirstSet == 0) { locals.lfirstSet = 1; locals.lfirst = locals.j; }
++                    }
++                    if (locals.lfirstSet != 0 && locals.lgiven < locals.lnet)
++                    {
++                        locals.give.set(locals.lfirst, locals.give.get(locals.lfirst) + (locals.lnet - locals.lgiven));
++                    }
++                }
++                locals.lv = locals.i + 1;
++            }
++            // never more than the counter holds
++            locals.potLeft = state.get().globalUnattributed;
++            locals.takeFromPot = 0;
++            for (locals.i = 0; locals.i < locals.n && locals.i < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.i++)
++            {
++                locals.part = locals.give.get(locals.i);
++                if (locals.part > locals.potLeft) locals.part = locals.potLeft;
++                locals.give.set(locals.i, locals.part);
++                locals.potLeft = locals.potLeft - locals.part;
++                locals.takeFromPot = locals.takeFromPot + locals.part;
++            }
++            if (locals.takeFromPot > 0) state.mut().globalUnattributed = state.get().globalUnattributed - locals.takeFromPot;
++            for (locals.i = 0; locals.i < locals.n && locals.i < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.i++)
++            {
++                if (locals.al.get(locals.i) == 0) continue;
++                locals.hid = locals.ids.get(locals.i);
++                locals.o = state.get().holdings.get(locals.hid);
++                locals.aaIn.holdingId = locals.hid;
++                locals.aaIn.newAsk = locals.o.askShares - locals.al.get(locals.i);
++                locals.aaIn.price = locals.o.qxBidPrice;
++                CALL(ApplyAsk, locals.aaIn, locals.aaOut);
++                locals.o = state.get().holdings.get(locals.hid);
++                locals.apIn.holdingId = locals.hid;
++                locals.apIn.h = locals.o;
++                locals.apIn.newShares = locals.o.shares;
++                locals.apIn.newPending = locals.o.pendingShares;
++                locals.apIn.markSettled = 0;
++                locals.apIn.claimEscrow = 1;
++                locals.apIn.retire = (locals.o.shares == 0 && locals.o.pendingShares == 0 && locals.o.askShares == 0) ? 1 : 0;
++                CALL(ApplyHolding, locals.apIn, locals.apOut);
++                if (locals.give.get(locals.i) > 0)
++                {
++                    locals.crIn.holdingId = locals.hid;
++                    locals.crIn.h = locals.apOut.h;
++                    locals.crIn.received = locals.give.get(locals.i);
++                    CALL(CreditProceeds, locals.crIn, locals.crOut);
++                }
++            }
++            return;
++        }
+         if (input.useUnrec != 0)
+         {
+             locals.u = input.unrec;
+         }
+         else
+         {
++            // K8.3: QX's book says how much of the bids has filled (a donated share is not a fill), and the universe must really hold that much beyond the recognised
++            // shares (nothing is credited that is not there).
++            locals.restBid.asset = input.asset;
++            locals.restBid.price = 0;
++            CALL(QxBidRest, locals.restBid, locals.restBidOut);
++            if (locals.restBidOut.returnCode != QPOOL_OK) return;
++            locals.u = (locals.led.pendingQx > locals.restBidOut.total) ? locals.led.pendingQx - locals.restBidOut.total : 0;
+             locals.held = qpi.numberOfShares(input.asset, AssetOwnershipSelect::byOwner(SELF), AssetPossessionSelect::byPossessor(SELF));
+             if (locals.held < 0) locals.held = 0;
+-            locals.u = ((uint64)locals.held > locals.led.recognized) ? (uint64)locals.held - locals.led.recognized : 0;
++            if (locals.u > ((uint64)locals.held > locals.led.recognized ? (uint64)locals.held - locals.led.recognized : 0))
++            {
++                locals.u = ((uint64)locals.held > locals.led.recognized) ? (uint64)locals.held - locals.led.recognized : 0;
++            }
+         }
+         if (locals.u == 0) return;
+         locals.wIn.led = locals.led;
+@@ -2553,6 +2869,20 @@
+         if (locals.kout.valid != 0 && state.get().sources.get(locals.kout.key, locals.led))
+         {
+             output.escrow = locals.led.escrow;
++            // K8.3: what the hook set aside for the unsold shares of resting asks is earmarked for those asks' holdings (Holding::qxEscrow). A SALE of another holding
++            // of the ledger is not held back by it (forSale); neither is the seat trade of ANOTHER holding. A seat trade of a listed holding counts its OWN earmarked
++            // dividends (holdingId): the buyer of a seat would otherwise take a share of dividends that were set aside for the seat owners of the day.
++            if (locals.led.qxSide == QPOOL_QX_SIDE_ASK)
++            {
++                locals.earmarked = 0;
++                for (locals.i = 0; locals.i < locals.led.qxCount && locals.i < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.i++)
++                {
++                    if (input.forSale == 0 && locals.led.qxHold.get(locals.i) == input.holdingId) continue;      // a seat trade of THIS holding still waits for its own dividends
++                    locals.o = state.get().holdings.get(locals.led.qxHold.get(locals.i));
++                    locals.earmarked = sadd(locals.earmarked, locals.o.qxEscrow);
++                }
++                output.escrow = (output.escrow > locals.earmarked) ? output.escrow - locals.earmarked : 0;
++            }
+         }
+     }
+ 
+@@ -2672,6 +3002,7 @@
+         output.ipoSettled = locals.h.ipoSettled;
+         output.payerIndex = locals.h.payerIndex;
+         output.rows = locals.h.rows;
++        output.askShares = locals.h.askShares;
+         locals.kin.asset = locals.h.asset;
+         locals.kin.ipoContractIndex = locals.h.ipoContractIndex;
+         locals.kin.payerIndex = locals.h.payerIndex;
+@@ -2680,7 +3011,7 @@
+         {
+             output.sourceEscrow = locals.led.escrow;
+             // The QX bid this holding has resting: the ledger records it (one per ledger), and only the holding that has pendingShares owns it.
+-            if (locals.h.pendingShares > 0 && locals.h.ipoContractIndex == 0)
++            if ((locals.h.pendingShares > 0 && locals.h.ipoContractIndex == 0) || locals.h.askShares > 0)
+             {
+                 output.qxBidPrice = locals.h.qxBidPrice;
+                 output.qxBidTick = locals.h.qxBidTick;
+@@ -2699,6 +3030,7 @@
+         if (input.holdingId >= QPOOL_MAX_HOLDINGS) return;
+         locals.h = state.get().holdings.get(input.holdingId);
+         output.costBasis = locals.h.costBasis;
++        output.holdingAskShares = locals.h.askShares;
+         locals.ok.member = input.member;
+         locals.ok.holdingId = input.holdingId;
+         if (!state.get().ownership.get(locals.ok, locals.own)) return;
+@@ -2790,6 +3122,8 @@
+         output.autoSettleDone = state.get().autoSettleDone;
+         output.autoSettleSkipped = state.get().autoSettleSkipped;
+         output.autoSettleTotal = state.get().autoSettleTotal;
++        output.restingAsks = state.get().restingAsks;
++        output.restingBids = state.get().restingBids;
+     }
+ 
+     PUBLIC_FUNCTION_WITH_LOCALS(GetSource)
+@@ -2804,6 +3138,9 @@
+         output.unsettled = locals.led.unsettled;
+         output.escrow = locals.led.escrow;
+         output.pendingQx = locals.led.pendingQx;
++        output.qxCount = locals.led.qxCount;
++        output.qxSide = locals.led.qxSide;
++        output.askTotal = locals.led.askTotal;
+         output.accHigh = locals.led.accX64.high;
+         output.accLow = locals.led.accX64.low;
+     }
+@@ -3307,7 +3644,7 @@
+         // Free: refund anything attached, whatever happens below.
+         if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
+         if (input.poolId >= QPOOL_MAX_POOLS || input.kind < QPOOL_KIND_BUY_QSWAP
+-            || input.kind > QPOOL_KIND_ALLOCATE)
++            || input.kind > QPOOL_KIND_SELL_QX_LIMIT)
+         {
+             output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
+         }
+@@ -3481,7 +3818,7 @@
+             // sandwiched swap that returns almost nothing.
+             if (input.kind != QPOOL_KIND_ALLOCATE
+                 && (input.shares == 0 || input.shares > locals.h.shares
+-                    || input.quAmount == 0))
++                    || (input.quAmount == 0 && input.kind != QPOOL_KIND_SELL_QX_LIMIT)))
+             {
+                 output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
+             }
+@@ -3508,6 +3845,14 @@
+             {
+                 output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
+             }
++            // K8.3: SELL_QX_LIMIT leaves the unsold part on QX's book. price is the limit (QX fills at the resting bids' own prices when they are at or above it, and
++            // later at THIS price when a buyer hits the rest); shares is the size; quAmount must be 0 (there is no minimum: the order may rest without filling at all).
++            if (input.kind == QPOOL_KIND_SELL_QX_LIMIT
++                && (input.price == 0 || input.quAmount != 0 || locals.h.asset.assetName == QPOOL_QPAY_ASSET_NAME
++                    || smul(input.price, input.shares) >= (uint64)MAX_AMOUNT))
++            {
++                output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
++            }
+         }
+ 
+         // Find a reusable slot: never touched, finished, or live in name only (an OPEN or PASSED proposal whose life is
+@@ -4180,6 +4525,13 @@
+                     && locals.heldBefore > 0 && (uint64)locals.heldBefore > locals.pLed.recognized)
+                 {
+                     locals.u0 = (uint64)locals.heldBefore - locals.pLed.recognized;
++                    // K8.3: no more than QX's book says has filled (a donated share is not a fill). Nothing is written yet: an unreadable book refuses.
++                    locals.restBid.asset = locals.h.asset;
++                    locals.restBid.price = 0;
++                    CALL(QxBidRest, locals.restBid, locals.restBidOut);
++                    if (locals.restBidOut.returnCode != QPOOL_OK) { output.returnCode = QPOOL_ERR_EXTERNAL_CALL; return; }
++                    locals.rest = (locals.pLed.pendingQx > locals.restBidOut.total) ? locals.pLed.pendingQx - locals.restBidOut.total : 0;
++                    if (locals.u0 > locals.rest) locals.u0 = locals.rest;
+                 }
+                 locals.qxBidIn.issuer = locals.p.asset.issuer;
+                 locals.qxBidIn.assetName = locals.p.asset.assetName;
+@@ -4436,6 +4788,7 @@
+             locals.escIn.asset = locals.h.asset;
+             locals.escIn.ipoContractIndex = locals.h.ipoContractIndex;
+             locals.escIn.payerIndex = locals.h.payerIndex;
++            locals.escIn.forSale = 1;
+             CALL(HoldingEscrow, locals.escIn, locals.escOut);
+             if (locals.escOut.escrow != 0)
+             {
+@@ -4561,7 +4914,7 @@
+                 locals.apIn.newPending = locals.h.pendingShares;
+                 locals.apIn.markSettled = 0;
+                 locals.apIn.claimEscrow = 0;
+-                locals.apIn.retire = (locals.apIn.newShares == 0 && locals.h.pendingShares == 0) ? 1 : 0;
++                locals.apIn.retire = (locals.apIn.newShares == 0 && locals.h.pendingShares == 0 && locals.h.askShares == 0) ? 1 : 0;
+                 CALL(ApplyHolding, locals.apIn, locals.apOut);
+                 locals.h = locals.apOut.h;
+                 // Management fee first, then proceeds ride the SAME accumulator
+@@ -4592,12 +4945,33 @@
+         //      itself failing, and then the sale is recorded for whatever did sell.
+         // The shares that sold and the QU that arrived are both known exactly when the calls
+         // return, so the sale is credited to THIS holding alone, like SELL_QSWAP.
+-        else if (locals.p.kind == QPOOL_KIND_SELL_QX)
++        else if (locals.p.kind == QPOOL_KIND_SELL_QX || locals.p.kind == QPOOL_KIND_SELL_QX_LIMIT)
+         {
++            locals.resting = (locals.p.kind == QPOOL_KIND_SELL_QX_LIMIT) ? 1 : 0;
++            locals.keep = 0;
+             locals.h = state.get().holdings.get(locals.p.holdingId);
+             if (locals.h.active == 0 || locals.p.shares == 0 || locals.h.shares < locals.p.shares)
+             {
+                 output.returnCode = QPOOL_ERR_INSUFFICIENT_BALANCE; return;
++            }
++            // K8.3: a resting sell needs a free place: the holding has no sell resting yet, the ledger lists no bids and has room, QPOOL's total of resting sells is below its bound.
++            if (locals.resting != 0)
++            {
++                if (locals.h.askShares != 0) { output.returnCode = QPOOL_ERR_QX_BID_PENDING; return; }
++                // BuyAndBurnQpay bids on QX against every ask of the QPAY token, QPOOL's own included, and could not book such a self trade: no resting sell of it.
++                if (locals.h.asset.assetName == QPOOL_QPAY_ASSET_NAME) { output.returnCode = QPOOL_ERR_INVALID_INPUT; return; }
++                locals.pkIn.asset = locals.h.asset;
++                locals.pkIn.ipoContractIndex = locals.h.ipoContractIndex;
++                locals.pkIn.payerIndex = locals.h.payerIndex;
++                CALL(SourceKeyOf, locals.pkIn, locals.pkOut);
++                if (locals.pkOut.valid == 0 || !state.get().sources.get(locals.pkOut.key, locals.pLed))
++                {
++                    output.returnCode = QPOOL_ERR_NOT_FOUND; return;
++                }
++                if (locals.pLed.unsettled != 0) { output.returnCode = QPOOL_ERR_SETTLEMENT_PENDING; return; }
++                if (locals.pLed.qxCount > 0 && locals.pLed.qxSide == QPOOL_QX_SIDE_BID) { output.returnCode = QPOOL_ERR_QX_SIDE_BUSY; return; }
++                if (locals.pLed.qxCount >= QPOOL_MAX_QX_BIDS_PER_LEDGER) { output.returnCode = QPOOL_ERR_QX_BID_PENDING; return; }
++                if (state.get().restingAsks >= QPOOL_MAX_RESTING_ASKS) { output.returnCode = QPOOL_ERR_CAPACITY; return; }
+             }
+             // Propose refuses these; a mandate built by other means must not reach QX either.
+             if (locals.p.price == 0 || smul(locals.p.price, locals.p.shares) >= (uint64)MAX_AMOUNT)
+@@ -4611,6 +4985,7 @@
+             locals.escIn.asset = locals.h.asset;
+             locals.escIn.ipoContractIndex = locals.h.ipoContractIndex;
+             locals.escIn.payerIndex = locals.h.payerIndex;
++            locals.escIn.forSale = 1;
+             CALL(HoldingEscrow, locals.escIn, locals.escOut);
+             if (locals.escOut.escrow != 0)
+             {
+@@ -4630,6 +5005,19 @@
+             locals.managedQx = qpi.numberOfShares(locals.h.asset,
+                 AssetOwnershipSelect{ SELF, QPOOL_QX_CONTRACT_INDEX, false, false },
+                 AssetPossessionSelect{ SELF, QPOOL_QX_CONTRACT_INDEX, false, false });
++            // K8.3: QX only lets an ask (and a hand-over of management) use shares that no resting ask has reserved. QPOOL's own resting asks of this asset (any holding's, any
++            // price) are reserved, so they do not count as available; the same read gives the size of QPOOL's order at the limit price BEFORE this call (a new ask at that
++            // price merges with it at QX, and what rests afterwards is the difference).
++            locals.restIn.asset = locals.h.asset;
++            locals.restIn.price = locals.p.price;
++            CALL(QxAskRest, locals.restIn, locals.restOut);
++            if (locals.restOut.returnCode != QPOOL_OK)
++            {
++                output.returnCode = locals.restOut.returnCode; return;
++            }
++            locals.restBeforeP = locals.restOut.rest;
++            locals.reservedAll = locals.restOut.total;
++            locals.managedQx = (locals.managedQx > (sint64)locals.reservedAll) ? locals.managedQx - (sint64)locals.reservedAll : 0;
+             locals.fromSelf = 0;
+             locals.fromQswap = 0;
+             locals.costs = 0;
+@@ -4665,10 +5053,28 @@
+             {
+                 output.returnCode = locals.bookOut.returnCode; return;
+             }
+-            if (locals.bookOut.sold == 0 || locals.bookOut.net < locals.p.quAmount
+-                || locals.bookOut.net <= locals.costs)
++            if (locals.resting == 0
++                && (locals.bookOut.sold == 0 || locals.bookOut.net < locals.p.quAmount
++                    || locals.bookOut.net <= locals.costs))
+             {
+                 output.returnCode = QPOOL_ERR_NO_FILL; return;
++            }
++            // K8.3: a resting sell whose immediate fills do not pay for the hand-over of its shares to QX's management (QX's fee, at most 2 x 100) is paid from QPOOL's own
++            // revenue; if there is less revenue than that, the sell is refused (nothing is written) rather than leaving the books short.
++            if (locals.resting != 0 && locals.costs > 0 && locals.bookOut.net <= locals.costs && state.get().pendingRevenue < locals.costs)
++            {
++                output.returnCode = QPOOL_ERR_INSUFFICIENT_FEE; return;
++            }
++            // K8.3: the asks that rest on this ledger already are credited with what has sold since the last credit BEFORE a new ask takes its place in the list: the shares
++            // that sold went from the front of the list, and a new cheaper ask must not be handed them. Before the counter is read for the call below.
++            if (locals.resting != 0 && locals.pLed.qxCount > 0)
++            {
++                locals.rlIn.asset = locals.h.asset;
++                locals.rlIn.payerIndex = (locals.h.ipoContractIndex != 0) ? locals.h.ipoContractIndex : locals.h.payerIndex;
++                locals.rlIn.useUnrec = 0;
++                locals.rlIn.unrec = 0;
++                CALL(ReconcileLedgerQx, locals.rlIn, locals.rlOut);
++                locals.h = state.get().holdings.get(locals.p.holdingId);
+             }
+ 
+             // ---- effects ----
+@@ -4745,7 +5151,8 @@
+                 CALL(QxAskRest, locals.restIn, locals.restOut);
+                 if (locals.restOut.returnCode == QPOOL_OK)
+                 {
+-                    locals.rest = locals.restOut.rest;
++                    // (K8.3: QPOOL's order at this price may have been there before; only the growth of it is this ask's unfilled part.)
++                    locals.rest = (locals.restOut.rest > locals.restBeforeP) ? locals.restOut.rest - locals.restBeforeP : 0;
+                 }
+                 else
+                 {
+@@ -4754,7 +5161,7 @@
+                 }
+                 if (locals.rest > locals.askShares) locals.rest = locals.askShares;
+                 // Cancel the unfilled rest, exactly, so no ask of QPOOL rests on the book.
+-                if (locals.rest > 0)
++                if (locals.rest > 0 && locals.resting == 0)
+                 {
+                     locals.qxRemIn.issuer = locals.h.asset.issuer;
+                     locals.qxRemIn.assetName = locals.h.asset.assetName;
+@@ -4769,6 +5176,7 @@
+                     }
+                 }
+                 locals.sold = locals.askShares - locals.rest;
++                if (locals.resting != 0) locals.keep = locals.rest;      // K8.3: the unfilled part is left on QX's book
+                 // Never book more shares as sold than the evidence allows: what left the pile, plus
+                 // what was filled against QPOOL's own bids (which the replay counted).
+                 if (locals.sold > sadd(locals.soldByHeld, locals.bookOut.ownTaken))
+@@ -4781,7 +5189,7 @@
+             locals.unpIn.before = locals.gaBefore;
+             CALL(UnparkArrivals, locals.unpIn, locals.unpOut);
+ 
+-            if (locals.sold == 0)
++            if (locals.sold == 0 && locals.keep == 0)
+             {
+                 // Nothing sold and no ask rests. The pre-checks make this unreachable unless QX
+                 // changed its mind about an order it was shown. A management hand-over that
+@@ -4804,16 +5212,33 @@
+             qpi.getEntity(SELF, locals.ent);
+             locals.balAfter = locals.ent.incomingAmount - locals.ent.outgoingAmount;
+             locals.received = (locals.balAfter > locals.balBefore) ? locals.balAfter - locals.balBefore : 0;
++            // K8.3: a resting sell that filled nothing (or too little) at once may still have cost the management hand-over fee: QPOOL's own revenue bears it, as it does for a sale
++            // that failed after the hand-over (above).
++            if (locals.resting != 0 && locals.received == 0 && locals.balBefore > locals.balAfter)
++            {
++                locals.fee = locals.balBefore - locals.balAfter;
++                state.mut().pendingRevenue = (state.get().pendingRevenue > locals.fee) ? state.get().pendingRevenue - locals.fee : 0;
++            }
++            // K8.3: the part that stays on QX's book is recorded first (its price, its place in the ledger's list); the weight change below then takes what sold and what
++            // rests out of the holding's shares.
++            if (locals.keep > 0)
++            {
++                locals.aaIn.holdingId = locals.p.holdingId;
++                locals.aaIn.newAsk = locals.keep;
++                locals.aaIn.price = locals.p.price;
++                CALL(ApplyAsk, locals.aaIn, locals.aaOut);
++                locals.h = state.get().holdings.get(locals.p.holdingId);
++            }
+             // Weight change goes through the choke point: it first credits what the holding
+             // earned on the shares it is about to lose, then shrinks the ledger's recognised
+             // total, and retires the holding if nothing is left of it.
+             locals.apIn.holdingId = locals.p.holdingId;
+             locals.apIn.h = locals.h;
+-            locals.apIn.newShares = locals.h.shares - locals.sold;
++            locals.apIn.newShares = locals.h.shares - locals.sold - locals.keep;
+             locals.apIn.newPending = locals.h.pendingShares;
+             locals.apIn.markSettled = 0;
+             locals.apIn.claimEscrow = 0;
+-            locals.apIn.retire = (locals.apIn.newShares == 0 && locals.h.pendingShares == 0) ? 1 : 0;
++            locals.apIn.retire = (locals.apIn.newShares == 0 && locals.h.pendingShares == 0 && locals.h.askShares == 0) ? 1 : 0;
+             CALL(ApplyHolding, locals.apIn, locals.apOut);
+             locals.h = locals.apOut.h;
+             locals.crIn.holdingId = locals.p.holdingId;
+@@ -4873,6 +5298,130 @@
+         // An IPO bid that cost the contract more than it booked (see the spend check in the BUY_IPO branch): recorded
+         // and used up like any other, but the caller is told the books are short.
+         output.returnCode = (locals.overspent != 0) ? QPOOL_ERR_BOOKS_INCONSISTENT : QPOOL_OK;
++    }
++
++    // ======================== CancelQxAsk ========================
++    // Take back the sell that a SELL_QX_LIMIT left resting on QX (procedure id 25, K8.3). The mirror of CancelQxBid, and simpler: a resting sell holds shares, not QU, so
++    // nothing is refunded -- the shares that did not sell go back into the holding's `shares`.
++    //
++    // WHO. A pool OPERATOR (the creator or one of his admins) at any time; anybody once the sell has rested for more than QPOOL_QX_BID_MAX_AGE_TICKS (so a stale sell cannot hold
++    // its ledger for ever). Anybody else: NOT_AUTHORIZED. Every refusal comes before the first write and refunds whatever was attached.
++    //
++    // WHAT. First the ledger's resting sells are credited with what has sold (ReconcileLedgerQx: shares gone, QU from the counter), so this holding's own sales are booked.
++    // What is left of its sell is then taken off QX's book (RemoveFromAskOrder at the recorded price, for at most what QX still lists at that price), and the shares go back
++    // to the holding. If QX removes nothing the call returns EXTERNAL_CALL (the sales credited meanwhile stay credited: they are facts).
++    struct CancelQxAsk_input { uint64 poolId; uint64 holdingId; };
++    // cancelledShares: shares taken off QX's book. pendingLeft: shares of the sell still booked as resting.
++    struct CancelQxAsk_output { uint32 returnCode; uint64 cancelledShares; uint64 pendingLeft; };
++    struct CancelQxAsk_locals
++    {
++        IsPoolOperator_input opIn; IsPoolOperator_output opOut;
++        Pool pool; Holding h;
++        SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
++        ReconcileLedgerQx_input rlIn; ReconcileLedgerQx_output rlOut;
++        QxAskRest_input restIn; QxAskRest_output restOut;
++        QX::RemoveFromAskOrder_input rmIn; QX::RemoveFromAskOrder_output rmOut;
++        ApplyAsk_input aaIn; ApplyAsk_output aaOut;
++        ApplyHolding_input apIn; ApplyHolding_output apOut;
++        uint64 allowed; uint64 n;
++    };
++    PUBLIC_PROCEDURE_WITH_LOCALS(CancelQxAsk)
++    {
++        if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
++        output.cancelledShares = 0;
++        output.pendingLeft = 0;
++        if (input.poolId >= QPOOL_MAX_POOLS || input.holdingId >= QPOOL_MAX_HOLDINGS)
++        {
++            output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
++        }
++        locals.pool = state.get().pools.get(input.poolId);
++        locals.h = state.get().holdings.get(input.holdingId);
++        if (locals.pool.active == 0 || locals.h.costBasis == 0 || locals.h.active == 0 || locals.h.poolId != input.poolId)
++        {
++            output.returnCode = QPOOL_ERR_NOT_FOUND; return;
++        }
++        locals.kin.asset = locals.h.asset;
++        locals.kin.ipoContractIndex = locals.h.ipoContractIndex;
++        locals.kin.payerIndex = locals.h.payerIndex;
++        CALL(SourceKeyOf, locals.kin, locals.kout);
++        if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led))
++        {
++            output.returnCode = QPOOL_ERR_NOT_FOUND; return;
++        }
++        locals.opIn.creator = locals.pool.creator;
++        locals.opIn.a0 = locals.pool.admin0;
++        locals.opIn.a1 = locals.pool.admin1;
++        locals.opIn.a2 = locals.pool.admin2;
++        locals.opIn.who = qpi.invocator();
++        CALL(IsPoolOperator, locals.opIn, locals.opOut);
++        locals.allowed = locals.opOut.yes;
++        if (locals.allowed == 0 && locals.h.askShares > 0 && locals.h.qxBidPrice != 0
++            && (uint64)qpi.tick() > locals.h.qxBidTick
++            && (uint64)qpi.tick() - locals.h.qxBidTick > QPOOL_QX_BID_MAX_AGE_TICKS)
++        {
++            locals.allowed = 1;
++        }
++        if (locals.allowed == 0)
++        {
++            output.returnCode = QPOOL_ERR_NOT_AUTHORIZED; return;
++        }
++        if (locals.h.askShares == 0 || locals.led.qxSide != QPOOL_QX_SIDE_ASK)
++        {
++            output.returnCode = QPOOL_ERR_NO_PENDING_ASK; return;
++        }
++        if (locals.h.qxBidPrice == 0)
++        {
++            output.returnCode = QPOOL_ERR_BOOKS_INCONSISTENT; return;
++        }
++        // The sales that have happened are credited first (to every resting sell of the ledger, this one included).
++        locals.rlIn.asset = locals.h.asset;
++        locals.rlIn.payerIndex = (locals.h.ipoContractIndex != 0) ? locals.h.ipoContractIndex : locals.h.payerIndex;
++        locals.rlIn.useUnrec = 0;
++        locals.rlIn.unrec = 0;
++        CALL(ReconcileLedgerQx, locals.rlIn, locals.rlOut);
++        locals.h = state.get().holdings.get(input.holdingId);
++        if (locals.h.askShares == 0)
++        {
++            output.returnCode = QPOOL_ERR_NO_PENDING_ASK; return;      // every share has sold: the credit above booked it
++        }
++        // What QX still lists at the recorded price (QPOOL's order there may be shared with the sells of other holdings): take back no more than that.
++        locals.restIn.asset = locals.h.asset;
++        locals.restIn.price = locals.h.qxBidPrice;
++        CALL(QxAskRest, locals.restIn, locals.restOut);
++        if (locals.restOut.returnCode != QPOOL_OK) { output.returnCode = locals.restOut.returnCode; output.pendingLeft = locals.h.askShares; return; }
++        locals.n = (locals.restOut.rest < locals.h.askShares) ? locals.restOut.rest : locals.h.askShares;
++        if (locals.n == 0)
++        {
++            output.pendingLeft = locals.h.askShares;
++            output.returnCode = QPOOL_ERR_EXTERNAL_CALL; return;
++        }
++        locals.rmIn.issuer = locals.h.asset.issuer;
++        locals.rmIn.assetName = locals.h.asset.assetName;
++        locals.rmIn.price = (sint64)locals.h.qxBidPrice;
++        locals.rmIn.numberOfShares = (sint64)locals.n;
++        INVOKE_OTHER_CONTRACT_PROCEDURE_E(QX, RemoveFromAskOrder, locals.rmIn, locals.rmOut, (sint64)0, rmErr);
++        if (rmErr != NoCallError || locals.rmOut.removedNumberOfShares != (sint64)locals.n)
++        {
++            output.pendingLeft = locals.h.askShares;
++            output.returnCode = QPOOL_ERR_EXTERNAL_CALL; return;
++        }
++        // The books: the sell shrinks (and leaves the list when nothing rests), then the shares go back to the holding through the choke point.
++        locals.aaIn.holdingId = input.holdingId;
++        locals.aaIn.newAsk = locals.h.askShares - locals.n;
++        locals.aaIn.price = locals.h.qxBidPrice;
++        CALL(ApplyAsk, locals.aaIn, locals.aaOut);
++        locals.h = state.get().holdings.get(input.holdingId);
++        locals.apIn.holdingId = input.holdingId;
++        locals.apIn.h = locals.h;
++        locals.apIn.newShares = locals.h.shares + locals.n;
++        locals.apIn.newPending = locals.h.pendingShares;
++        locals.apIn.markSettled = 0;
++        locals.apIn.claimEscrow = 1;
++        locals.apIn.retire = 0;
++        CALL(ApplyHolding, locals.apIn, locals.apOut);
++        output.cancelledShares = locals.n;
++        output.pendingLeft = locals.apOut.h.askShares;
++        output.returnCode = QPOOL_OK;
+     }
+ 
+     // Refresh a QX-bid holding's share count against on-chain reality. A QX bid
+@@ -4897,7 +5446,7 @@
+         if (input.holdingId >= QPOOL_MAX_HOLDINGS) { output.returnCode = QPOOL_ERR_INVALID_INPUT; return; }
+         locals.h = state.get().holdings.get(input.holdingId);
+         if (locals.h.costBasis == 0 || locals.h.active == 0) { output.returnCode = QPOOL_ERR_NOT_FOUND; return; }
+-        if (locals.h.ipoContractIndex != 0)
++        if (locals.h.ipoContractIndex != 0 && locals.h.askShares == 0)      // (K8.3: an IPO holding with a resting sell is reconciled like any other)
+         {
+             output.returnCode = QPOOL_ERR_WRONG_STATUS; return;
+         }
+@@ -4919,10 +5468,10 @@
+ 
+         // K8.2: the unclaimed shares of the ledger are handed to ALL its resting bids in priority order (QxWaterfall), not only to this holding's: whoever calls, every
+         // bid is credited what it has won. This holding learns what it got.
+-        if (locals.h.pendingShares > 0 && locals.led.qxCount > 0)
++        if (((locals.h.pendingShares > 0 && locals.h.ipoContractIndex == 0) || locals.h.askShares > 0) && locals.led.qxCount > 0)
+         {
+             locals.rlIn.asset = locals.h.asset;
+-            locals.rlIn.payerIndex = locals.h.payerIndex;
++            locals.rlIn.payerIndex = (locals.h.ipoContractIndex != 0) ? locals.h.ipoContractIndex : locals.h.payerIndex;
+             locals.rlIn.useUnrec = 0;
+             locals.rlIn.unrec = 0;
+             CALL(ReconcileLedgerQx, locals.rlIn, locals.rlOut);
+@@ -4930,6 +5479,7 @@
+         }
+         output.shares = locals.h.shares;
+         output.pendingShares = locals.h.pendingShares;
++        output.askShares = locals.h.askShares;
+         output.returnCode = QPOOL_OK;
+     }
+ 
+@@ -4978,6 +5528,7 @@
+         TakeBackRefund_input tbIn; TakeBackRefund_output tbOut;
+         QX::RemoveFromBidOrder_input rmIn; QX::RemoveFromBidOrder_output rmOut;
+         Entity ent; uint128 accrued; sint64 held;
++        QxBidRest_input restBid; QxBidRest_output restBidOut; uint64 bookFills;
+         uint64 allowed; uint64 unclaimed; uint64 newClaim; uint64 pendingNow; uint64 removed;
+         uint64 balBefore; uint64 balAfter; uint64 gaBefore; uint64 arrived; uint64 viaHook; uint64 refund;
+         uint64 give; uint64 returned; uint64 leftover; uint64 base; uint64 i; uint64 prefix; uint64 cum; uint64 prevCum; uint64 refundEach;
+@@ -5046,6 +5597,13 @@
+         if (locals.held < 0) locals.held = 0;
+         locals.unclaimed = ((uint64)locals.held > locals.led.recognized)
+             ? (uint64)locals.held - locals.led.recognized : 0;
++        // K8.3: QX's book says how much of the bids has filled (a donated share is not a fill); nothing has been written yet, so an unreadable book refuses.
++        locals.restBid.asset = locals.h.asset;
++        locals.restBid.price = 0;
++        CALL(QxBidRest, locals.restBid, locals.restBidOut);
++        if (locals.restBidOut.returnCode != QPOOL_OK) { output.returnCode = QPOOL_ERR_EXTERNAL_CALL; return; }
++        locals.bookFills = (locals.led.pendingQx > locals.restBidOut.total) ? locals.led.pendingQx - locals.restBidOut.total : 0;
++        if (locals.unclaimed > locals.bookFills) locals.unclaimed = locals.bookFills;
+         // K8.2: this bid's fills are what the waterfall hands it (the bids above it in the ledger's priority order are served first).
+         locals.wIn.led = locals.led;
+         locals.wIn.unrec = locals.unclaimed;
+@@ -6170,7 +6728,8 @@
+         }
+         // alone in its ledger, never paid, nothing in flight
+         if (locals.led.holdings != 1 || locals.led.accruedX64 != uint128(0, 0) || locals.led.escrow != 0 || locals.led.pendingQx != 0
+-            || locals.led.unsettled != 0 || locals.h.totalPayouts != 0 || locals.h.rows != 1)
++            || locals.led.unsettled != 0 || locals.h.totalPayouts != 0 || locals.h.rows != 1
++            || locals.h.askShares != 0 || locals.led.qxCount != 0 || locals.led.askTotal != 0)      // K8.3: not while a sell rests on QX
+         {
+             output.returnCode = QPOOL_ERR_WRONG_STATUS; return;
+         }
+@@ -6394,6 +6953,13 @@
+             qpi.transfer(qpi.invocator(), qpi.invocationReward());
+             output.returnCode = QPOOL_ERR_OFFER_CHANGED; return;
+         }
++        // K8.3: the same guard for the shares that rest on QX: a buyer cannot name them, and a silent sale credited by anyone's ReconcileHolding would turn the backing he read into
++        // proceeds of the seller before his purchase lands. So a seat of a holding that rests a sell waits until the sell has sold out or been taken back.
++        if (locals.h.askShares != 0)
++        {
++            qpi.transfer(qpi.invocator(), qpi.invocationReward());
++            output.returnCode = QPOOL_ERR_SETTLEMENT_PENDING; return;
++        }
+         // Every refusal that needs only the offer, the holding, its pool and the attachment comes BEFORE
+         // SyncHolding: SyncHolding writes the state (a whole-state re-hash for the owner) whenever the
+         // holding's source has accrued something new, and a refused call must not do that.
+@@ -6404,6 +6970,8 @@
+         locals.escIn.asset = locals.h.asset;
+         locals.escIn.ipoContractIndex = locals.h.ipoContractIndex;
+         locals.escIn.payerIndex = locals.h.payerIndex;
++        locals.escIn.forSale = 0;
++        locals.escIn.holdingId = input.holdingId;
+         CALL(HoldingEscrow, locals.escIn, locals.escOut);
+         if (locals.escOut.escrow != 0)
+         {
+@@ -6840,6 +7408,7 @@
+         REGISTER_USER_PROCEDURE(BuyAndBurnQpay, 22);
+         REGISTER_USER_PROCEDURE(CancelQxBid, 23);
+         REGISTER_USER_PROCEDURE(SetPoolAdmins, 24);
++        REGISTER_USER_PROCEDURE(CancelQxAsk, 25);
+     }
+ 
+     INITIALIZE()
+@@ -7135,6 +7704,7 @@
+         SourceKey key; SourceLedger led; Asset asset; AssetPossessionIterator it;
+         uint128 scaled; uint64 fee; uint64 net; uint64 held; uint64 unrec; uint64 att;
+         Holding hq; uint64 qi; uint64 qhid; uint64 qleft; uint64 qtake; uint64 qpart; uint64 qgiven; uint64 qaside; uint64 qfirst; uint64 qfirstId;
++        uint64 qk; uint64 qcap;
+     };
+     POST_INCOMING_TRANSFER_WITH_LOCALS()
+     {
+@@ -7170,7 +7740,7 @@
+                 // but are not recognised yet. Capped at what that bid asked for, so
+                 // stray donated shares never hold back anyone's dividend.
+                 locals.unrec = 0;
+-                if (locals.led.unsettled == 0 && locals.led.pendingQx > 0 && locals.led.assetName != 0)
++                if (locals.led.unsettled == 0 && (locals.led.pendingQx > 0 || locals.led.askTotal > 0) && locals.led.assetName != 0)
+                 {
+                     // The asset a ledger earns on: issued by the payer for a TOKEN ledger, by
+                     // the protocol (NULL_ID) for a CONTRACT ledger, whose payer is the contract.
+@@ -7186,7 +7756,9 @@
+                     if (locals.held > locals.led.recognized)
+                     {
+                         locals.unrec = locals.held - locals.led.recognized;
+-                        if (locals.unrec > locals.led.pendingQx) locals.unrec = locals.led.pendingQx;
++                        // K8.3: for resting asks the unrecognised shares are the unsold ones, at most askTotal
++                        locals.qcap = (locals.led.qxSide == QPOOL_QX_SIDE_ASK) ? locals.led.askTotal : locals.led.pendingQx;
++                        if (locals.unrec > locals.qcap) locals.unrec = locals.qcap;
+                     }
+                 }
+                 // Nothing recognised and nothing waiting to be: this payment is not on
+@@ -7240,12 +7812,16 @@
+                             locals.qleft = locals.unrec;
+                             locals.qgiven = 0;
+                             locals.qfirst = 0;
+-                            for (locals.qi = 0; locals.qi < locals.led.qxCount && locals.qi < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.qi++)
++                            // K8.3: bids are served from the front of the list (the shares that arrived belong to the highest price first); the unsold shares of asks are
++                            // those the cheapest asks sold last: they belong to the END of the list (the highest price), so asks are served from the back.
++                            for (locals.qk = 0; locals.qk < locals.led.qxCount && locals.qk < QPOOL_MAX_QX_BIDS_PER_LEDGER; locals.qk++)
+                             {
+                                 if (locals.qleft == 0) break;
++                                locals.qi = (locals.led.qxSide == QPOOL_QX_SIDE_ASK) ? (locals.led.qxCount - 1 - locals.qk) : locals.qk;
+                                 locals.qhid = locals.led.qxHold.get(locals.qi);
+                                 locals.hq = state.get().holdings.get(locals.qhid);
+-                                locals.qtake = (locals.hq.pendingShares < locals.qleft) ? locals.hq.pendingShares : locals.qleft;
++                                locals.qtake = (locals.led.qxSide == QPOOL_QX_SIDE_ASK) ? locals.hq.askShares : locals.hq.pendingShares;
++                                if (locals.qtake > locals.qleft) locals.qtake = locals.qleft;
+                                 if (locals.qtake == 0) continue;
+                                 locals.qleft = locals.qleft - locals.qtake;
+                                 locals.qpart = div((uint128)locals.qaside * (uint128)locals.qtake, (uint128)locals.unrec).low;

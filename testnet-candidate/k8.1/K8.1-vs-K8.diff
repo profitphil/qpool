@@ -1,0 +1,248 @@
+--- final8/QPool-K8.h	2026-10-21 15:07:20
++++ final81/QPool-K8.1.h	2026-10-21 22:25:58
+@@ -74,8 +74,8 @@
+ //   Only ONE such bid may rest per payer ledger (CheckSource refuses a second BUY_QX with QPOOL_ERR_QX_BID_PENDING), so the ledger records the
+ //   resting bid's limit price and the tick it was placed at (SourceLedger::qxBidPrice and qxBidTick; shown by GetHolding): QX removes an order by
+ //   issuer, asset, price and size, there are no order ids.
+-//   CancelQxBid (procedure 23) takes the bid back. It may be called, whenever they like, by the creator of the pool that owns the bid and by anybody who
+-//   owns seats in that holding (a nonzero cost in it: the people who funded the bid, or bought their seat from them), and by ANYONE once the bid has
++//   CancelQxBid (procedure 23) takes the bid back. It may be called, whenever they like, by the pool's OPERATORS (its creator and the up to three admins
++//   the creator named with SetPoolAdmins; K8.1) and by ANYONE once the bid has
+ //   rested for more than QPOOL_QX_BID_MAX_AGE_TICKS (72 hours), so that a forgotten or hostile bid cannot hold every other pool's BUY_QX on its asset
+ //   blocked for ever. It first counts what has already filled (a read: the fills are credited together with the cancel), asks QX to remove exactly what
+ //   still rests (RemoveFromBidOrder) and QX pays price x shares straight back. That QU is credited, like the refund of a BUY, to the uncommitted
+@@ -109,7 +109,7 @@
+ //   Execute spends the YES voters' money (up to the budget) ALL-IN on the first bid: min(676, floor(assigned / opening price)) seats at the opening
+ //   price. It keeps the holding's bid prices in a small list (StateData::ipoBids) next to the (target, price) registry (ipoPrices).
+ //   An auction is lost and won in the last hour, and a pool that has been outbid and has its money back must be able to bid again, so
+-//   RebidIpo (permissionless for the people with money at stake: the caller must own a seat of the holding) places a further bid whenever it is
++//   RebidIpo (K8.1: only the pool's OPERATORS, the creator and the admins he named with SetPoolAdmins) places a further bid whenever it is
+ //   wanted, as often as it is wanted, with no cooldown. It is bounded by MONEY and by nothing else: a bid of n seats at price p is allowed when
+ //   p x n is at most the holding's FREE FUNDS and at most the contract's physical balance. Free funds are the never-bid rest of the budget plus
+ //   everything that has been outbid and has COME BACK: a RebidIpo first reconciles the holding against the live book in ONE pass over the 676
+@@ -394,7 +394,7 @@
+ constexpr uint64 QPOOL_PROPOSAL_LIFETIME = QPOOL_VOTE_WINDOW + QPOOL_EXECUTE_WINDOW;
+ constexpr uint64 QPOOL_IPO_PROPOSAL_LIFETIME = QPOOL_IPO_VOTE_WINDOW + QPOOL_EXECUTE_WINDOW;   // the same for a BUY_IPO (see VoteWindowOf)
+ static_assert(QPOOL_IPO_VOTE_WINDOW <= QPOOL_VOTE_WINDOW);
+-// A QX bid that BUY_QX left resting is cancelled by CancelQxBid: by its pool's creator or by an owner of its seats whenever they like, and by
++// A QX bid that BUY_QX left resting is cancelled by CancelQxBid: by its pool's operators (creator and admins) whenever they like, and by
+ // ANYONE once it has rested for more than this many ticks, so that a stale bid cannot hold the QX_BID_PENDING block on its asset for ever.
+ // Nominal ticks like every window here (see QPOOL_TICKS_PER_HOUR): 259,200 at one tick per second.
+ constexpr uint64 QPOOL_QX_BID_MAX_AGE_TICKS = 72 * QPOOL_TICKS_PER_HOUR;   // 3 days
+@@ -641,6 +641,10 @@
+         uint64 ownershipRows;   // seat rows (member, holding) of this pool's holdings, at most QPOOL_MAX_OWNERSHIP_PER_POOL
+         uint64 depositCount;    // holdings of this pool that its creator deposited, at most QPOOL_MAX_DEPOSITS_PER_POOL
+         uint64 ipoHoldings;     // unsettled IPO holdings of this pool, at most QPOOL_MAX_IPO_HOLDINGS_PER_POOL
++        // The pool's ADMINS (K8.1): up to three ids the creator named with SetPoolAdmins (NULL_ID = empty slot). The creator and the admins are the pool's
++        // OPERATORS: they alone carry out passed proposals (Execute), rebid for an IPO holding (RebidIpo) and cancel a resting QX bid before it is stale
++        // (CancelQxBid). An admin has no other power: no vote weight, no access to anybody's QU, and cannot name admins.
++        id admin0; id admin1; id admin2;      // (QPI Array capacities must be powers of two, so three plain fields)
+     };
+ 
+     struct ContribKey
+@@ -1314,6 +1318,15 @@
+     struct SetAdmission_output { uint32 returnCode; };
+     struct SetAdmission_locals { Pool pool; ContribKey key; };
+ 
++    // ---- operators (K8.1): the creator and the admins the creator named ----
++    struct IsPoolOperator_input { id creator; id a0; id a1; id a2; id who; };
++    struct IsPoolOperator_output { uint32 yes; };
++
++    // SetPoolAdmins (procedure id 24): the creator names up to three admins, replacing the list (NULL_ID in a slot leaves it empty, three NULL_IDs clear the list).
++    struct SetPoolAdmins_input { uint64 poolId; id admin0; id admin1; id admin2; };
++    struct SetPoolAdmins_output { uint32 returnCode; };
++    struct SetPoolAdmins_locals { Pool pool; };
++
+     struct SetPermissioned_input { uint64 poolId; uint64 permissioned; };
+     struct SetPermissioned_output { uint32 returnCode; };
+     struct SetPermissioned_locals { Pool pool; };
+@@ -1371,6 +1384,7 @@
+     struct Execute_output { uint32 returnCode; uint64 holdingId; uint64 acquired; uint64 proceeds; uint64 sold; uint64 refunded; };
+     struct Execute_locals
+     {
++        IsPoolOperator_input opIn; IsPoolOperator_output opOut;
+         Proposal p; Pool pool; Holding h; ContribKey ck; Contribution c;
+         OwnKey ok; Ownership own; uint128 scaled;
+         VoteKey vk; VoteChoice voteChoice;
+@@ -1476,7 +1490,7 @@
+     };
+ 
+     // RebidIpo (procedure id 13; deleted in K2 and reinstated by the owner's final IPO decision D1): a further bid for an unsettled IPO
+-    // holding, by a seat owner, bounded by MONEY and nothing else. price: the price per share (1 .. 1,479,289,940,828, above the minimum of a
++    // holding, by a pool operator (K8.1: the creator or one of his admins), bounded by MONEY and nothing else. price: the price per share (1 .. 1,479,289,940,828, above the minimum of a
+     // full book; a price of ANOTHER holding of this IPO is refused, a price this holding already has is reused: it adds seats there).
+     // quantity: the slots to bid; 0 = as many as the free funds buy at this price (at most 676). The bid is allowed when price x quantity is at
+     // most the holding's free funds at the START of the call (after the call's own reconcile pass has turned the refunds of EARLIER evictions into
+@@ -1495,6 +1509,7 @@
+     };
+     struct RebidIpo_locals
+     {
++        Pool pool; IsPoolOperator_input opIn; IsPoolOperator_output opOut;
+         Holding h; OwnKey ok; Ownership own; IpoBids bids; IpoBids nb; IpoPriceKey key; IpoTarget row; uint64 rowIdx;
+         IpoRowOf_input rowIn; IpoRowOf_output rowOut;
+         IpoSeatsNow_input snIn; IpoSeatsNow_output snOut;
+@@ -1590,6 +1605,7 @@
+         uint64 unattributedQu; uint64 permissioned;
+         // what the pool uses of the shared tables, and the quotas those are measured against (QPOOL_MAX_*_PER_POOL)
+         uint64 offerCount; uint64 admittedCount; uint64 ownershipRows; uint64 depositCount; uint64 ipoHoldings;
++        id admin0; id admin1; id admin2;      // K8.1: the admins the creator named (NULL_ID = empty slot); with the creator they are the pool's operators
+     };
+     struct GetPool_locals { Pool pool; };
+ 
+@@ -2498,6 +2514,9 @@
+         output.admittedCount = locals.pool.admittedCount;
+         output.ownershipRows = locals.pool.ownershipRows;
+         output.depositCount = locals.pool.depositCount;
++        output.admin0 = locals.pool.admin0;
++        output.admin1 = locals.pool.admin1;
++        output.admin2 = locals.pool.admin2;
+         output.ipoHoldings = locals.pool.ipoHoldings;
+     }
+ 
+@@ -3642,10 +3661,47 @@
+         output.returnCode = QPOOL_OK;
+     }
+ 
++    // ======================== Operators (K8.1) ========================
++    // True when `who` is the pool's creator or one of the (up to three) admins the creator named. NULL_ID is never an operator (an empty admin slot is NULL_ID).
++    PRIVATE_FUNCTION(IsPoolOperator)
++    {
++        output.yes = 0;
++        if (input.who == NULL_ID) return;
++        if (input.who == input.creator || input.who == input.a0 || input.who == input.a1 || input.who == input.a2) output.yes = 1;
++    }
++
++    // The creator names the pool's admins (replacing the whole list; NULL_ID leaves a slot empty). An admin may be any id (a member, a keeper bot, a second wallet of the
++    // creator); it need not be on the roster. Refused: a non-creator (including an admin: admins cannot name admins), the contract's own id, the creator himself
++    // (he is an operator already) and the same id twice. The change is effective at once and can be undone at once; a list that is already as asked writes nothing.
++    PUBLIC_PROCEDURE_WITH_LOCALS(SetPoolAdmins)
++    {
++        if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
++        if (input.poolId >= QPOOL_MAX_POOLS) { output.returnCode = QPOOL_ERR_INVALID_INPUT; return; }
++        locals.pool = state.get().pools.get(input.poolId);
++        if (locals.pool.active == 0) { output.returnCode = QPOOL_ERR_NOT_FOUND; return; }
++        if (qpi.invocator() != locals.pool.creator) { output.returnCode = QPOOL_ERR_NOT_AUTHORIZED; return; }
++        if (input.admin0 == SELF || input.admin1 == SELF || input.admin2 == SELF
++            || input.admin0 == locals.pool.creator || input.admin1 == locals.pool.creator || input.admin2 == locals.pool.creator
++            || (input.admin0 != NULL_ID && (input.admin0 == input.admin1 || input.admin0 == input.admin2))
++            || (input.admin1 != NULL_ID && input.admin1 == input.admin2))
++        {
++            output.returnCode = QPOOL_ERR_INVALID_INPUT; return;
++        }
++        if (locals.pool.admin0 == input.admin0 && locals.pool.admin1 == input.admin1 && locals.pool.admin2 == input.admin2)
++        {
++            output.returnCode = QPOOL_OK; return;      // nothing changes: nothing is written
++        }
++        locals.pool.admin0 = input.admin0;
++        locals.pool.admin1 = input.admin1;
++        locals.pool.admin2 = input.admin2;
++        state.mut().pools.set(input.poolId, locals.pool);
++        output.returnCode = QPOOL_OK;
++    }
++
+     // ======================== Execution ========================
+ 
+-    // Carry out a passed proposal. Permissionless — anyone may fire it, because
+-    // the mandate came from the vote, not the caller. Must run inside the
++    // Carry out a passed proposal. K8.1: only the pool's OPERATORS (the creator and the admins he named) may fire it -- the mandate came from the vote, and the
++    // operators choose the moment inside the window (so nobody else can fire it at a price somebody else moved). Must run inside the
+     // execute window (EXECUTE_WINDOW ticks after the VOTE closed) so a stale mandate cannot be fired at a new
+     // price. A BUY is paid by the members who voted YES and only by them, each for at most the weight he voted
+     // with, and the order is sized to their money (see the BUY branch); a SELL or ALLOCATE needs no votes any more
+@@ -3677,6 +3733,15 @@
+         }
+         locals.pool = state.get().pools.get(locals.p.poolId);
+         if (locals.pool.active == 0) { output.returnCode = QPOOL_ERR_NOT_FOUND; return; }
++        // K8.1: only the pool's operators (the creator and the admins he named) place the orders. The expiry above stays permissionless (it only closes a dead mandate);
++        // a mandate nobody carries out simply lapses at the end of the execute window and nothing was spent.
++        locals.opIn.creator = locals.pool.creator;
++        locals.opIn.a0 = locals.pool.admin0;
++        locals.opIn.a1 = locals.pool.admin1;
++        locals.opIn.a2 = locals.pool.admin2;
++        locals.opIn.who = qpi.invocator();
++        CALL(IsPoolOperator, locals.opIn, locals.opOut);
++        if (locals.opOut.yes == 0) { output.returnCode = QPOOL_ERR_NOT_AUTHORIZED; return; }
+ 
+         // ---------------- BUY paths ----------------
+         // ORDER OF OPERATIONS (money safety): every check first, then a READ-ONLY
+@@ -4742,8 +4807,7 @@
+     // ======================== CancelQxBid ========================
+     // Take back the QX bid that a BUY_QX left resting (procedure id 23). See "BUYING ON QX" at the top for the design.
+     //
+-    // WHO. The creator of the pool that owns the holding, or a seat owner of the holding (an Ownership row of the caller with a nonzero cost: the
+-    // people who funded the bid, or bought their seat from one of them), at any time; or ANYBODY once the bid has rested for more than
++    // WHO. A pool OPERATOR (K8.1: the creator of the pool that owns the holding, or one of the admins he named), at any time; or ANYBODY once the bid has rested for more than
+     // QPOOL_QX_BID_MAX_AGE_TICKS since the tick it was placed at (SourceLedger::qxBidTick), so that a stale bid cannot block the payer's ledger for
+     // ever. Anybody else: NOT_AUTHORIZED. Whoever calls, the QU goes to the seat owners, never to the caller.
+     //
+@@ -4777,6 +4841,7 @@
+     struct CancelQxBid_output { uint32 returnCode; uint64 cancelledShares; uint64 refunded; uint64 pendingLeft; };
+     struct CancelQxBid_locals
+     {
++        IsPoolOperator_input opIn; IsPoolOperator_output opOut;
+         Pool pool; Holding h; ContribKey ck; Contribution c; OwnKey ok; Ownership own; OfferKey fk;
+         SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
+         ApplyHolding_input apIn; ApplyHolding_output apOut;
+@@ -4819,13 +4884,14 @@
+             output.returnCode = QPOOL_ERR_NOT_FOUND; return;
+         }
+         // ---- 2. who may cancel ----
+-        locals.allowed = (qpi.invocator() == locals.pool.creator) ? 1 : 0;
+-        if (locals.allowed == 0)
+-        {
+-            locals.ok.member = qpi.invocator();
+-            locals.ok.holdingId = input.holdingId;
+-            if (state.get().ownership.get(locals.ok, locals.own) && locals.own.cost > 0) locals.allowed = 1;
+-        }
++        // K8.1: the pool's operators (the creator and the admins he named) at any time; everybody else only once the bid is stale (below).
++        locals.opIn.creator = locals.pool.creator;
++        locals.opIn.a0 = locals.pool.admin0;
++        locals.opIn.a1 = locals.pool.admin1;
++        locals.opIn.a2 = locals.pool.admin2;
++        locals.opIn.who = qpi.invocator();
++        CALL(IsPoolOperator, locals.opIn, locals.opOut);
++        locals.allowed = locals.opOut.yes;
+         if (locals.allowed == 0 && locals.led.pendingQx > 0 && locals.led.qxBidPrice != 0
+             && (uint64)qpi.tick() > (uint64)locals.led.qxBidTick
+             && (uint64)qpi.tick() - (uint64)locals.led.qxBidTick > QPOOL_QX_BID_MAX_AGE_TICKS)
+@@ -5158,7 +5224,7 @@
+         output.returnCode = QPOOL_OK;
+     }
+ 
+-    // A further bid for an unsettled IPO holding, by a seat owner, bounded by MONEY and nothing else: the price is any the free funds pay
++    // A further bid for an unsettled IPO holding, by a pool operator (creator or admin), bounded by MONEY and nothing else: the price is any the free funds pay
+     // for (there is no ceiling), the quantity is whatever the free funds buy at it (there is no voted quantity), any number of times, no
+     // cooldown. See "IPO BIDDING AND REBIDDING" and "THE MONEY RULE" at the top. The order of the work is the order of the cost:
+     //   1. input ranges, the holding, the caller's seat, the registry (a price of ANOTHER holding of this IPO is taken; one of this holding's
+@@ -5188,12 +5254,18 @@
+         {
+             output.returnCode = QPOOL_ERR_IPO_NOT_ACTIVE; return;
+         }
+-        // Only a seat owner: the people with money at stake act for the holding, a stranger cannot grief it.
+-        locals.ok.member = qpi.invocator();
+-        locals.ok.holdingId = input.holdingId;
+-        if (!state.get().ownership.get(locals.ok, locals.own) || locals.own.cost == 0)
++        // K8.1: only the pool's operators (the creator and the admins he named) bid for the holding. Any seat owner could before; the owner decided that the
++        // creator runs the auction, with up to three admins for the days he cannot.
++        locals.pool = state.get().pools.get(locals.h.poolId);
++        locals.opIn.creator = locals.pool.creator;
++        locals.opIn.a0 = locals.pool.admin0;
++        locals.opIn.a1 = locals.pool.admin1;
++        locals.opIn.a2 = locals.pool.admin2;
++        locals.opIn.who = qpi.invocator();
++        CALL(IsPoolOperator, locals.opIn, locals.opOut);
++        if (locals.pool.active == 0 || locals.opOut.yes == 0)
+         {
+-            output.returnCode = QPOOL_ERR_NOT_MEMBER; return;
++            output.returnCode = QPOOL_ERR_NOT_AUTHORIZED; return;
+         }
+         if (!state.get().ipoBids.get(input.holdingId, locals.bids))
+         {
+@@ -6634,6 +6706,7 @@
+         REGISTER_USER_PROCEDURE(EvictSquat, 21);
+         REGISTER_USER_PROCEDURE(BuyAndBurnQpay, 22);
+         REGISTER_USER_PROCEDURE(CancelQxBid, 23);
++        REGISTER_USER_PROCEDURE(SetPoolAdmins, 24);
+     }
+ 
+     INITIALIZE()

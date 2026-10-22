@@ -1,0 +1,9 @@
+pool,name,kind,creator,members,persona
+P1,Alpha,public,U01,U09 U10 U11 U12 U13 U14 U15,QX trader + IPO regular
+P2,Beta,public,U02,U16 U17 U18 U19 U20 U09 U10,aggressive IPO hunter
+P3,Gamma,private,U03,U21 U22 U23 U24 U11,"dividend-yield pool, private, creator deposits TOK2"
+P4,Delta,public,U04,U25 U26 U27 U28 U12,QSWAP trader
+P5,Epsilon,private,U05,U29 U30 U13 U21,conservative private IPO pool
+P6,Zeta,public,U06,U14 U15 U16 U22 U25 U29 U30,"mixed: QX, QSWAP and IPO"
+P7,Eta,public,U07,U17 U23 U26 U30,"small pool, seat-market heavy"
+P8,Theta,private,U08,U18 U24 U27 U28,"private pool that toggles public, deposits TOK1"

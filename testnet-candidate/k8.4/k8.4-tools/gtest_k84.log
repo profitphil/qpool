@@ -1,0 +1,39 @@
+== gtest (cancel_qx_test.cpp, all suites)
+[build] compiling the test (k88final)
+[run] k88final filter=*
+Running main() from ../src/gtest_main.cc
+[==========] Running 55 tests from 8 test suites.
+[----------] Global test environment set-up.
+[----------] 1 test from CancelQxBidBase
+[----------] 1 test from CancelQxBidBase (3578 ms total)
+
+[----------] 12 tests from CancelQxBid
+[ DISABLED ] CancelQxBid.DISABLED_ASquattingBidIsReleasedByAnyoneAfterTheAgeLimit
+[----------] 12 tests from CancelQxBid (61238 ms total)
+
+[----------] 2 tests from Operators
+[----------] 2 tests from Operators (7967 ms total)
+
+[----------] 4 tests from MultiBid
+[----------] 4 tests from MultiBid (17492 ms total)
+
+[----------] 1 test from RestingBid
+[----------] 1 test from RestingBid (4173 ms total)
+
+[----------] 17 tests from RestingSell
+[----------] 17 tests from RestingSell (92913 ms total)
+
+[----------] 17 tests from RestingMixed
+[----------] 17 tests from RestingMixed (64243 ms total)
+
+[----------] 1 test from Size
+QPOOL_SIZEOF StateData=208920624 Holding=256 SourceLedger=664
+[----------] 1 test from Size (1 ms total)
+
+[----------] Global test environment tear-down
+[==========] 55 tests from 8 test suites ran. (251611 ms total)
+[  PASSED  ] 55 tests.
+
+  YOU HAVE 1 DISABLED TEST
+
+exit: 0

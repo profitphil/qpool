@@ -1,0 +1,1964 @@
+--- ../review/QPoolK6.h	2026-10-21 10:23:23
++++ final8/QPoolK8-devkit.h	2026-10-21 15:08:12
+@@ -50,11 +50,10 @@
+ //   only venue. All three kinds of holding of one contract earn from ONE CONTRACT ledger
+ //   keyed id(index,0,0,0) and split a dividend by shares, whatever way they came in.
+ //   The asset name does not say which contract pays on it and contracts cannot read
+-//   contractDescriptions, so the (index, name) pair is checked as far as it can be: exactly
+-//   against an embedded mainnet table for indices 1..30, and for any other index by keeping
+-//   the pairing one-to-one (contractNames) plus a check that the index is a registered contract
+-//   that is not in its IPO epoch (this does not prove its IPO has ended). See ContractPairKnown /
+-//   CheckContractPair for what that does and does not prove.
++//   contractDescriptions, so nobody TYPES a name for an IPO (a BUY_IPO carries none) and a pair (index, name) is
++//   accepted for a purchase or a deposit only when it is PROVEN: exactly against an embedded mainnet table for
++//   indices 1..30, and for any other index only if the REGISTRY maps the name to that index. The registry is
++//   filled from the chain's own events and from nothing a user can say: see "THE NAME OF AN IPO'S SHARES".
+ //
+ // SELLING ON QX — immediate, never resting
+ //   KIND_SELL_QX sells at once: Execute places ONE ask at the proposal's limit price, QX
+@@ -68,6 +67,22 @@
+ //   checked before anything moves (see QxBidBook); a sale the book cannot meet is refused with
+ //   QPOOLK6_ERR_NO_FILL and the proposal stays PASSED, free to be retried inside its window.
+ //
++// BUYING ON QX -- a bid may rest, and CancelQxBid takes it back
++//   KIND_BUY_QX places ONE bid at the proposal's limit price. Passive limit orders are wanted, so a bid that does not fill at once is NOT cancelled:
++//   QX fills what it can at the resting asks' own prices inside the call (those shares are recognised at once), and the rest RESTS on QX with its QU
++//   locked there. It is booked as the new holding's pendingShares and fills later, silently; ReconcileHolding credits the shares when they arrive.
++//   Only ONE such bid may rest per payer ledger (CheckSource refuses a second BUY_QX with QPOOLK6_ERR_QX_BID_PENDING), so the ledger records the
++//   resting bid's limit price and the tick it was placed at (SourceLedger::qxBidPrice and qxBidTick; shown by GetHolding): QX removes an order by
++//   issuer, asset, price and size, there are no order ids.
++//   CancelQxBid (procedure 23) takes the bid back. It may be called, whenever they like, by the creator of the pool that owns the bid and by anybody who
++//   owns seats in that holding (a nonzero cost in it: the people who funded the bid, or bought their seat from them), and by ANYONE once the bid has
++//   rested for more than QPOOLK6_QX_BID_MAX_AGE_TICKS (72 hours), so that a forgotten or hostile bid cannot hold every other pool's BUY_QX on its asset
++//   blocked for ever. It first counts what has already filled (a read: the fills are credited together with the cancel), asks QX to remove exactly what
++//   still rests (RemoveFromBidOrder) and QX pays price x shares straight back. That QU is credited, like the refund of a BUY, to the uncommitted
++//   balances of the seat owners in proportion to their cost units, and their cost units shrink by the same amount, so the costs keep adding up to the QU
++//   that is really spent. A holding left with no shares, nothing resting and nothing earned is freed the way SettleIpo frees a failed IPO; one that only
++//   sold out is retired like any sold-out holding. If nothing rests, or QX removes nothing, the call writes nothing and is refused.
++//
+ // SECONDARY MARKET — buy-outs
+ //   A member may offer all or part of a position in one holding at a price they
+ //   set; anyone may fill it. QU goes to the seller and the cost units transfer
+@@ -83,8 +98,9 @@
+ //   OfferPosition and BuyPosition, and a claim that finds nothing owed, comes before the first write.
+ //
+ // IPO BIDDING AND REBIDDING -- the budget is the only limit; a pool keeps bidding for as long as the auction runs
+-//   A BUY_IPO proposal carries a target contract, a share name, a BUDGET (quAmount: the QU the pool allocates) and an OPENING price (the price of
+-//   the first bid, a starting point the voters look at, not a limit on later bids). It carries NO quantity and NO ceiling price (owner decision
++//   A BUY_IPO proposal carries a target contract (its index), a BUDGET (quAmount: the QU the pool allocates) and an OPENING price (the price of
++//   the first bid, a starting point the voters look at, not a limit on later bids). It carries NO share name (the name of the shares is read
++//   from the chain, see "THE NAME OF AN IPO'S SHARES"), NO quantity and NO ceiling price (owner decision
+ //   D1, final): the higher the price of an IPO goes, the fewer seats the same money buys, and a pool cannot know how high an auction will go, so
+ //   the money is the only governing factor. The seats a holding holds are whatever its money buys at the prices it bids, and they shrink as the price
+ //   rises; nothing else bounds them but the core's own 676 slots. (Propose_input.shares is ignored for a BUY_IPO; Propose stores the opening
+@@ -138,17 +154,76 @@
+ //       the IPO failed) and counts QPOOL's slots per bid price in one pass over the 676 slots; a price belongs to ONE
+ //       holding (ipoPrices), so this is exact, and a holding with several prices simply has several rows. It stores, per
+ //       price, the seats won and what they cost at the final price;
+-//     * SettleIpo (permissionless, only after the epoch in which the snapshot was taken) adds up the rows of the holding's
++//     * the settlement (SettleHolding: run by BEGIN_EPOCH of the next epoch for the holdings that are ready, see "SETTLEMENT AT BEGIN_EPOCH", and by
++//       the permissionless SettleIpo for anybody else; only after the epoch in which the snapshot was taken) adds up the rows of the holding's
+ //       prices, hands back the budget that was never bid plus everything the holding bid and did not spend (evicted slots,
+ //       premium over the final price, the whole bid of a failed IPO) and recognises exactly the seats it won. Nothing it does
+ //       depends on the order in which holdings settle, on a stale count, on how often the holding was reconciled or on the pot
+ //       ipoRefundEscrow that collects the refunds (the pot is only a solvency clamp). Evidence that the auction is over is
+ //       positive: the snapshot exists for this target, and the epoch has moved on. A stranger cannot end a running auction, and a
+ //       book that cannot be read is not mistaken for a finished one.
+-//   A holding that won seats under a name the universe cannot prove (the shares are not there under the name the
+-//   vote declared, or another ledger owns the name) is NOT settled and NOT retired: SettleIpo returns NAME_UNPROVEN
+-//   and writes nothing, so the members' capital stays on the books.
++//   A holding that won seats needs the name of the shares: the settlement takes it from the registry (below). While the registry has none yet
++//   it refuses with NAME_PENDING and writes nothing (BEGIN_EPOCH skips the holding, SettleIpo returns the code, and anybody can call it again later). When the
++//   name is known and QPOOL does not hold enough shares of it to cover the seats, the holding is NOT settled and NOT retired: NAME_UNPROVEN, nothing
++//   is written, so the members' capital stays on the books. A holding that won no seat (a failed IPO, a lost auction) needs no name and settles as
++//   soon as the epoch has moved on.
+ //
++// THE NAME OF AN IPO'S SHARES -- read from the chain, never typed
++//   A BUY_IPO names a target contract INDEX, a budget and an opening price, and no share name. The core alone decides everything about an IPO,
++//   the name of the shares it issues included (contractDescriptions, which no contract can read), so QPOOL learns the pair (index, name) from the
++//   chain itself, in two steps that bracket the epoch change (doc/contracts.md; qubic.cpp endEpoch(), processTick()):
++//     1. END_EPOCH (runs BEFORE the core's finishIPOs(), system.epoch is still the IPO epoch): every contract index above the embedded table
++//        whose IPO ends now and whose book is FULL (qpi.ipoBidPrice of the last slot above 0: the very condition finishIPOs tests before it
++//        issues the shares) is appended to a small queue, in ascending order, at most once per epoch (nameQueueEpoch).
++//     2. BEGIN_EPOCH of the next epoch (after finishIPOs and before the first tick; also after a node restart, so it is idempotent): the issuances of
++//        the zero issuer NULL_ID are walked (finishIPOs is the only way an asset of that issuer comes to exist: QPI refuses a contract that tries).
++//        A name that is neither in the embedded table nor in the registry is NEW. The FIRST call ever records every such name as
++//        'known, never paired' (contractNames value 0): the baseline, the contracts that IPO'd before this contract existed. Every later call PAIRS
++//        its new names with the queued indices, but only if the COUNTS agree (as many new names as queued indices). Any other count means the
++//        chain did something this contract did not predict (an IPO whose shares could not be issued, a name of a source it does not know, a
++//        queue that overflowed, a walk that did not end within its bound): the epoch is QUARANTINED. Nothing is paired, the new names are
++//        recorded as 'known, never paired', the queue is emptied and the mismatch is counted (GetNameRegistry), so that a later epoch pairs its
++//        own, new names again. Nothing is ever guessed.
++//   WHICH name goes to which index, when two or more IPOs end in one epoch, cannot be read from the ORDER of the walk: the core rebuilds the asset
++//   table in endEpoch(), right after finishIPOs() (assetsEndEpoch(): every record is re-inserted in the order of the slots of the possession
++//   records, which are hashes of the HOLDERS' keys), so the order the walk sees is not the order of the issuance. With ONE new name and ONE queued
++//   index the pair is certain. With several, END_EPOCH stores for each queued index a fingerprint of its final book (the sum over its 676 slots of the
++//   K12 hash of the bidder) and BEGIN_EPOCH computes the same number from the holders of each new name (the sum over its possession records of
++//   shares x the hash of the holder): finishIPOs gives one share to the bidder of each slot and nothing moves before BEGIN_EPOCH, so the
++//   fingerprint of the right name is the fingerprint of the right book. A pairing is accepted only when every new name matches exactly ONE queued
++//   index and every queued index exactly ONE name; two books with the same bidders (one wallet that took both) cannot be told apart and are
++//   quarantined. A fingerprint collision could only cause a refusal, never a wrong pair: a name that matches two books is ambiguous, and the
++//   right book always matches (its fingerprint is the name's own).
++//   The registry is contractNames (name -> index, 0 = known, never paired) and indexNames (index -> name). An entry is never removed and never
++//   changed. A purchase or a deposit of contract shares above the embedded table needs its (index, name) in it (ContractPairKnown), and the settlement
++//   of an IPO holding takes the name of its target's index from it (NameOfIndex). Nothing a user types can claim, squat or poison a name.
++//
++// SETTLEMENT AT BEGIN_EPOCH -- pools do not have to call SettleIpo
++//   One routine settles an IPO holding (SettleHolding, a private procedure) and two callers use it: BEGIN_EPOCH, which settles the holdings that are ready
++//   at the first tick of every epoch, and the permissionless user procedure SettleIpo, the manual backup. They behave the same and return the same
++//   codes; a holding that BEGIN_EPOCH has settled answers a later SettleIpo with IPO_NOT_ACTIVE, like every settled holding.
++//   WHEN. The start of the epoch after the IPO is the first moment everything a settlement needs is there: END_EPOCH took the snapshot of the book,
++//   finishIPOs() paid the refunds (they have arrived in ipoRefundEscrow: the hook ran then) and issued the shares, and BEGIN_EPOCH's first step
++//   (PairNames) has paired the new name with its index. The settlement is the second step, right behind it, whatever the first one did.
++//   WHICH. A holding is ready when its target's row in ipoTargets has a snapshot and the epoch has moved on. Nothing is searched when no row is
++//   ready; otherwise the holdings are read from ipoBids (the table of the unsettled IPO holdings: at most QPOOLK6_MAX_IPO_HOLDINGS, 64 words of
++//   occupation flags to pass and one field to read per holding), never from the pools or from all holdings. A holding the routine refuses (the
++//   name is pending, QPOOL holds too few shares of it, books that do not add up) is skipped: nothing is written for it and the loop goes on.
++//   HOW MUCH. At most QPOOLK6_AUTO_SETTLE_MAX holdings per epoch are handed to the routine, settled or refused (the constant says how the cost was
++//   counted). A pass that stops at the bound leaves a cursor (autoSettleCursor, a slot of ipoBids) behind the last holding it handed over and the
++//   next epoch's pass starts there, so holdings that are refused cannot keep the ones behind them waiting for ever. What is not reached stays
++//   unsettled, keeps its capital on the books and can be settled by SettleIpo at any time.
++//   ONCE. A second BEGIN_EPOCH of the same epoch (a node restart at the first tick) returns before it reads anything (autoSettleEpoch is the epoch of
++//   the last pass). A holding is never settled twice: settling removes it from ipoBids and marks it settled, the target's row and the ledger's
++//   unsettled counter go down by one each time, and the routine refuses a settled holding before it writes anything.
++//   MONEY. BEGIN_EPOCH has no invocation reward and no QU leaves the contract in it. The routine only moves bookkeeping: it credits the members'
++//   balances inside the contract from the budget that was never bid and from the refund pot (ipoRefundEscrow), shrinks their cost units, retires
++//   a holding that won nothing, and releases the dividends parked on the ledger when the last holding of the target settles. The only QU transfer
++//   of a manual settlement is SettleIpo's refund of an invocation reward attached to the call, which is in SettleIpo and not in the routine.
++//   WHAT A KEEPER SEES. GetStats: readyUnsettled (the holdings that are ready and unsettled, counted now), autoSettleEpoch / autoSettleDone /
++//   autoSettleSkipped for the last pass and autoSettleTotal. SettleIpo is needed only while readyUnsettled is above 0 and the last pass hit its bound
++//   or skipped holdings.
++//
+ // SHARED TABLES, PER-POOL QUOTAS AND THE LIFE OF A SLOT (audit step K5)
+ //   Every table that all pools share -- offers, allow-list entries, seat rows (ownership), holding slots, unsettled IPO holdings -- is sized
+ //   as (number of pools) x (a per-pool quota), and a static_assert at the constants ties each pair. A pool can never use more than its quota:
+@@ -183,7 +258,8 @@
+ // INTEGRATION CONSTRAINTS (verified against qpi_ipo_impl.h and ipo.h)
+ //   qpi.bidInIPO returns -1 if called while a contract callback is running, so
+ //   IPO bids can never fire from END_EPOCH. All execution is therefore done by
+-//   permissionless user procedures. bidInIPO also requires
++//   permissionless user procedures (the settlement of the IPO holdings that are ready is the one exception: BEGIN_EPOCH does it, and SettleIpo stays
++//   as the manual backup). bidInIPO also requires
+ //   SELF_INDEX < IPOContractIndex, so a pool can only bid on IPOs of contracts
+ //   deployed AFTER it, and only during constructionEpoch - 1.
+ 
+@@ -318,6 +394,10 @@
+ constexpr uint64 QPOOLK6_PROPOSAL_LIFETIME = QPOOLK6_VOTE_WINDOW + QPOOLK6_EXECUTE_WINDOW;
+ constexpr uint64 QPOOLK6_IPO_PROPOSAL_LIFETIME = QPOOLK6_IPO_VOTE_WINDOW + QPOOLK6_EXECUTE_WINDOW;   // the same for a BUY_IPO (see VoteWindowOf)
+ static_assert(QPOOLK6_IPO_VOTE_WINDOW <= QPOOLK6_VOTE_WINDOW);
++// A QX bid that BUY_QX left resting is cancelled by CancelQxBid: by its pool's creator or by an owner of its seats whenever they like, and by
++// ANYONE once it has rested for more than this many ticks, so that a stale bid cannot hold the QX_BID_PENDING block on its asset for ever.
++// Nominal ticks like every window here (see QPOOLK6_TICKS_PER_HOUR): 259,200 at one tick per second.
++constexpr uint64 QPOOLK6_QX_BID_MAX_AGE_TICKS = 72 * QPOOLK6_TICKS_PER_HOUR;   // 3 days
+ // qpi.tick() is a 32-bit number; a tick stored in a record is clamped to it (an expiry cannot pass the last tick there is).
+ constexpr uint64 QPOOLK6_TICK_LIMIT        = 0xFFFFFFFFULL;
+ 
+@@ -378,8 +458,9 @@
+ constexpr uint64 QPOOLK6_REVENUE_QPAYBUY_PERMILLE     = 200; // 20% set aside to buy QPAY tokens on QX and burn them
+ // The rest (10 percent plus every rounding leftover) is burned into the fee reserve.
+ static_assert(QPOOLK6_REVENUE_SHAREHOLDER_PERMILLE + QPOOLK6_REVENUE_QPAYHUB_PERMILLE + QPOOLK6_REVENUE_QPAYBUY_PERMILLE < 1000);
+-// There is NO minimum payout: END_EPOCH splits whatever revenue exists. Anything under 845 QU pays no shareholder (80 percent of it
+-// divides to less than 1 QU per share) and is burned in full.
++// There is NO minimum payout: END_EPOCH splits whatever revenue exists. Revenue under 1,690 QU in an epoch pays no shareholder (its 40
++// percent divides to less than 1 QU per share); that part falls into the burn with the other leftovers. The 30 and 20 percent legs
++// are paid in full whatever the amount.
+ // TEST-ONLY devkit substitution: the upstream testnet-candidate build hardcodes 29,
+ // matching real QPAYHUB's assumed position on the mainnet index table it was designed
+ // against. Index 29 in THIS devkit is QTREAT, and QPAYHUB doesn't exist here at all, so
+@@ -416,7 +497,7 @@
+ 
+ // ---- Proposal kinds ----
+ constexpr uint64 QPOOLK6_KIND_BUY_QSWAP   = 1; // atomic swap QU -> asset
+-constexpr uint64 QPOOLK6_KIND_BUY_QX      = 2; // place QX bid order
++constexpr uint64 QPOOLK6_KIND_BUY_QX      = 2; // place QX bid order; what does not fill at once RESTS on QX (CancelQxBid takes it back)
+ constexpr uint64 QPOOLK6_KIND_BUY_IPO     = 3; // bid in a contract IPO
+ constexpr uint64 QPOOLK6_KIND_SELL_QSWAP  = 4; // atomic swap asset -> QU
+ constexpr uint64 QPOOLK6_KIND_SELL_QX     = 5; // sell now on QX: limit ask matched in the call, unfilled rest cancelled
+@@ -460,7 +541,7 @@
+ constexpr uint32 QPOOLK6_ERR_NOT_AUTHORIZED = 22;
+ constexpr uint32 QPOOLK6_ERR_SOURCE_CONFLICT = 23;    // this payer is already bound to a different asset
+ constexpr uint32 QPOOLK6_ERR_SETTLEMENT_PENDING = 24; // dividends for this asset are parked awaiting settlement; also: the seats of an IPO holding that has not been settled yet cannot be offered or bought
+-constexpr uint32 QPOOLK6_ERR_QX_BID_PENDING = 25;     // a QX bid on this payer's asset has not been reconciled yet
++constexpr uint32 QPOOLK6_ERR_QX_BID_PENDING = 25;     // a QX bid on this payer's asset has not been reconciled yet (CancelQxBid takes a resting bid back)
+ constexpr uint32 QPOOLK6_ERR_DISABLED = 26;           // unused since KIND_SELL_QX was repaired; kept so numbering stays append-only
+ constexpr uint32 QPOOLK6_ERR_QX_ONLY = 27;            // contract shares can only be sold through QX, never swapped on QSWAP
+ constexpr uint32 QPOOLK6_ERR_CONTRACT_MISMATCH = 28;  // the asset name and the paying contract's index do not belong together
+@@ -469,12 +550,14 @@
+ constexpr uint32 QPOOLK6_ERR_BOOKS_INCONSISTENT = 31; // defence in depth: a pool's records do not add up (a roster or balance defect); refused before anything moved
+ constexpr uint32 QPOOLK6_ERR_SEAT_LOCKED = 32;        // the seat took part in a vote on a SELL or ALLOCATE proposal that is still open: it cannot be offered or sold until that vote ends
+ constexpr uint32 QPOOLK6_ERR_DEPOSIT_AFTER_OPEN = 33; // QU was added to the member's balance after this BUY proposal opened: that money has no vote on it
+-constexpr uint32 QPOOLK6_ERR_NAME_UNPROVEN = 34;      // SettleIpo: the holding won seats but the shares of its declared name cannot be proven to be them; nothing was settled
++constexpr uint32 QPOOLK6_ERR_NAME_UNPROVEN = 34;      // SettleIpo: the holding won seats and the registry knows the name of the target's shares, but QPOOL does not hold enough of them to cover the seats; nothing was settled
+ constexpr uint32 QPOOLK6_ERR_IPO_NO_SNAPSHOT = 35;    // SettleIpo: the target's IPO is over but QPOOL's END_EPOCH left no snapshot of its book; nothing can be settled
+ constexpr uint32 QPOOLK6_ERR_PRICE_TOO_LOW = 36;      // RebidIpo: the book is full and the price does not exceed its minimum, so the bid could not win a seat
+ constexpr uint32 QPOOLK6_ERR_SEATS_FULL = 37;         // unused: a BUY_IPO has no voted quantity (seats are what the money buys); kept so numbering stays append-only
+-constexpr uint32 QPOOLK6_ERR_OFFER_CHANGED = 38;      // BuyPosition: the live offer is not the parcel the buyer expected -- the seller replaced it, or (F-02 fix) a sale changed the holding's real backing since the buyer read it; refunded, nothing written
++constexpr uint32 QPOOLK6_ERR_OFFER_CHANGED = 38;      // BuyPosition: what the buyer expected is not what is live now -- the offer's cost units are not expectedCostUnits (the seller replaced it), or the holding's recorded shares are not expectedShares (a sale or a reconcile changed its backing since the buyer read it); refunded, nothing written
+ constexpr uint32 QPOOLK6_ERR_NOTHING_TO_BUY = 39;      // BuyAndBurnQpay: no QPAY is on offer at or below the ceiling (or the pot is empty); nothing was written
++constexpr uint32 QPOOLK6_ERR_NO_PENDING_BID = 40;      // CancelQxBid: the holding has no QX bid resting (none was placed, or every share of it has filled); nothing was written
++constexpr uint32 QPOOLK6_ERR_NAME_PENDING = 41;        // the share name of this contract index is not verified: the registry has no (index, name) pair for it (SettleIpo: BEGIN_EPOCH has not paired the IPO's name yet, retry after the next epoch start; a purchase or deposit above the embedded table: the name is not paired to this index, or never could be); nothing was written
+ 
+ // ---- Dividend source kinds ----
+ constexpr uint64 QPOOLK6_SOURCE_TOKEN    = 0; // QU sent by the asset's issuer (standardTransaction / qpiTransfer)
+@@ -484,24 +567,46 @@
+ // A contract's shares are issued by the protocol, so the asset says nothing about WHICH
+ // contract pays on it, and contracts cannot read contractDescriptions. The paying
+ // contract's index therefore always comes from the user (the proposal's holdingId field
+-// for BUY_QX, an input field for DepositHoldingAsset, the IPO target for BUY_IPO), and
+-// the link between that index and the asset name is checked as far as it can be:
++// for BUY_QX and for BUY_IPO, an input field for DepositHoldingAsset), and the link between
++// that index and the asset name is PROVEN, never trusted (see "THE NAME OF AN IPO'S SHARES"):
+ //   - indices 1..QPOOLK6_KNOWN_CONTRACTS: against the mainnet table (KnownContractName),
+ //     exactly;
+-//   - higher indices: not verifiable. A name already bound to one index is refused for
+-//     another (contractNames), a ledger bound to one name refuses another, and for shares
+-//     that already exist the index must be a contract that exists and has left its IPO.
++//   - higher indices: only against the registry, which maps a name to an index when the chain's
++//     own events (END_EPOCH and BEGIN_EPOCH) have paired them. A name that is not in the registry,
++//     or that the registry saw and could not pair, is refused (NAME_PENDING); a name paired to
++//     another index is refused (CONTRACT_MISMATCH). An IPO bid carries no name at all.
+ constexpr uint64 QPOOLK6_KNOWN_CONTRACTS   = 30;   // size of the embedded table
+ // The protocol caps the number of contracts at MAX_NUMBER_OF_CONTRACTS = 1024 (common_def.h),
+ // so no valid index is above 1023. The live bound (the contract must exist) is read from the
+ // core with qpi.ipoBidPrice, so nothing here needs updating when a contract is added.
+ constexpr uint64 QPOOLK6_MAX_CONTRACT_INDEX = 1023;
+ constexpr uint64 QPOOLK6_MAX_ASSET_NAME    = 0xFFFFFFFFFFFFFFULL; // asset names are at most 7 bytes
+-// name -> index for bound ledgers above the table: at most one entry per contract index, so
+-// at most 1023 - 30 = 993 entries can ever exist; 2048 keeps the table under 50 percent full.
++// The registry of share names (StateData::contractNames, name -> index; indexNames, index -> name). A key is a share name of the zero issuer
++// that is not in the embedded table, and such an asset is created only by the core's finishIPOs(), once per contract index (a contract has
++// one IPO epoch; a second contract with the same name fails issueAsset, so its IPO fails and issues nothing), so there are at most 1,023
++// keys. Nothing is ever removed (no tombstones), and BEGIN_EPOCH writes only names its walk has just read. 2048 keeps the table at or under
++// 50 percent full in the worst case, where all 1,023 names are outside the table.
+ constexpr uint64 QPOOLK6_MAX_CONTRACT_NAMES = 2048;
+ static_assert((QPOOLK6_MAX_CONTRACT_NAMES & (QPOOLK6_MAX_CONTRACT_NAMES - 1)) == 0);
+-static_assert(QPOOLK6_MAX_CONTRACT_NAMES > QPOOLK6_MAX_CONTRACT_INDEX - QPOOLK6_KNOWN_CONTRACTS);
++static_assert(QPOOLK6_MAX_CONTRACT_NAMES >= 2 * QPOOLK6_MAX_CONTRACT_INDEX);
++static_assert(((QPOOLK6_MAX_CONTRACT_INDEX + 1) & QPOOLK6_MAX_CONTRACT_INDEX) == 0);        // indexNames has one place per index 0..1023
++// The success queue: the contract indices whose IPO ends in this epoch with a full book, filled by END_EPOCH and emptied by the next BEGIN_EPOCH.
++// A handful of IPOs finish in an epoch; 16 is far more. A seventeenth sets the overflow flag and the pairing of that epoch is refused.
++constexpr uint64 QPOOLK6_NAME_QUEUE_CAP = 16;
++static_assert((QPOOLK6_NAME_QUEUE_CAP & (QPOOLK6_NAME_QUEUE_CAP - 1)) == 0);
++// BEGIN_EPOCH's hard bounds: at most 1,023 issuances of the zero issuer can exist (one per contract index), so a walk that is still going after
++// QPOOLK6_NAME_WALK_MAX steps is not a walk of this chain and is stopped (the epoch is quarantined). A new asset has at most NUMBER_OF_COMPUTORS
++// (676) holders with shares; the walk over the holders of one name stops after QPOOLK6_NAME_HOLDERS_MAX records.
++constexpr uint64 QPOOLK6_NAME_WALK_MAX     = QPOOLK6_MAX_CONTRACT_INDEX + 1;
++constexpr uint64 QPOOLK6_NAME_HOLDERS_MAX  = 1024;
++static_assert(QPOOLK6_NAME_HOLDERS_MAX > NUMBER_OF_COMPUTORS);
++// The automatic settlement of BEGIN_EPOCH (see "SETTLEMENT AT BEGIN_EPOCH"): at most this many IPO holdings are handed to the settlement routine per
++// epoch, whether it settles them or refuses them. One settlement costs at most about 2,100 hash-table probes (at most 256 roster members x 6
++// probes in the refund loop, 256 x 2 in the loop that clears a holding that is freed, about 50 for the snapshot rows, the bid prices and the
++// ledger) and one walk of QPOOL's own records in the universe; 32 of them are at most about 67,000 probes (a pool of 20 members costs about 150).
++// The rest of the ready holdings wait for the next epoch's BEGIN_EPOCH or for a manual SettleIpo.
++constexpr uint64 QPOOLK6_AUTO_SETTLE_MAX   = 32;
++static_assert(QPOOLK6_AUTO_SETTLE_MAX >= 1 && QPOOLK6_AUTO_SETTLE_MAX <= QPOOLK6_MAX_IPO_HOLDINGS);
+ 
+ struct QPOOLK62 {};
+ 
+@@ -631,7 +736,7 @@
+         // holding or id(payerIndex,0,0,0) for bought or deposited contract shares (kind CONTRACT),
+         // otherwise asset.issuer (kind TOKEN).
+         uint128 srcSnapX64;       // SourceLedger.accX64 at this holding's last sync
+-        uint64 ipoSettled;        // 1 once SettleIpo has run (IPO holdings only)
++        uint64 ipoSettled;        // 1 once the settlement has run, by BEGIN_EPOCH or by SettleIpo (IPO holdings only)
+         // Contract shares that are NOT an IPO holding (bought on QX or deposited): the
+         // index of the contract that pays on them, so the holding earns from the same
+         // CONTRACT ledger as an IPO holding of that contract. 0 for every other holding.
+@@ -691,6 +796,12 @@
+         uint64 unsettled;    // IPO holdings not yet through SettleIpo (CONTRACT kind only)
+         uint64 escrow;       // net QU parked until it can be paid to the right holdings
+         uint64 pendingQx;    // sum(pendingShares) over live QX-bid holdings (TOKEN or CONTRACT kind)
++        // The ONE QX bid pendingQx counts (CheckSource lets a ledger have only one): its limit price and the tick it was placed at. Execute writes
++        // them when a BUY_QX leaves a remainder resting (NoteQxBid); they are cleared where pendingQx falls to 0 (ReconcileHolding, CancelQxBid:
++        // ForgetQxBid), and go with the ledger. They mean something only while pendingQx > 0. CancelQxBid names the order to QX by the price (QX removes by
++        // issuer, asset, price and size) and measures QPOOLK6_QX_BID_MAX_AGE_TICKS from the tick. The 4 bytes after the tick are alignment padding.
++        uint64 qxBidPrice;
++        uint32 qxBidTick;
+         uint64 bindEpoch;    // qpi.epoch() when the ledger was created: how long a binding that never paid has stood (EvictSquat)
+     };
+ 
+@@ -728,14 +839,6 @@
+         uint64 costUnits; // cost basis offered for sale
+         uint64 askPrice;  // QU demanded for the whole parcel
+         uint64 poolId;    // the pool whose quota (Pool.offerCount) the offer counts against: whoever removes the offer gives it back
+-        // Holding.shares when this offer was last written (F-02 fix). costUnits is a claim on the
+-        // holding's ownership denominator, which a sale does not shrink -- but a buyer pricing the
+-        // parcel from what GetPosition showed is pricing it against THIS many real shares backing
+-        // it, and a sale (SELL_QX / SELL_QSWAP) between the buyer's read and BuyPosition silently
+-        // changes that without touching costUnits or askPrice, so the existing expectedCostUnits
+-        // check (audit C033) never catches it. BuyPosition now refuses (OFFER_CHANGED) unless the
+-        // holding's current shares still match what the offer last saw.
+-        uint64 sharesSnapshot;
+     };
+ 
+     // (target contract, bid price) of a live IPO holding: see StateData::ipoPrices.
+@@ -830,10 +933,11 @@
+         // payer -> ledger of the asset it pays on. Holds NO holding ids, so a
+         // retired or reused holding slot can never be a stale target.
+         HashMap<SourceKey, SourceLedger, QPOOLK6_MAX_SOURCES> sources;
+-        // asset name -> contract index, for CONTRACT ledgers above the embedded table that
+-        // are bound to a name. Keeps the pairing one-to-one: a name bound to one index is
+-        // refused for another, so one contract's shares can never be counted in another
+-        // contract's ledger. Entry lifetime = the ledger's.
++        // The REGISTRY of contract share names, name -> contract index (see "THE NAME OF AN IPO'S SHARES"). A key is a share name of the zero
++        // issuer that is not in the embedded table. It is written by BEGIN_EPOCH only: the index the chain's own events paired it with, or 0 =
++        // the name exists but was never paired (the baseline of the first call, a quarantined epoch). Keeps the pairing one-to-one: a name
++        // paired to one index is refused for another, so one contract's shares can never be counted in another contract's ledger. An entry is
++        // never removed and never changes once it holds an index. The other direction is StateData::indexNames (at the end of the state).
+         HashMap<uint64, uint64, QPOOLK6_MAX_CONTRACT_NAMES> contractNames;
+         // (target contract, bid price) -> the IPO holding that bid at that price, for every UNSETTLED IPO holding. The
+         // order book of an IPO shows every slot QPOOL holds with its price and no owner, so slots are attributed to
+@@ -875,6 +979,35 @@
+         uint64 totalQpayhubDeposited;
+         uint64 totalQpaySpent;       // QU spent on QPAY
+         uint64 totalQpayBurned;      // QPAY shares burned
++
++        // ---- the registry of contract share names: the other direction, the success queue and the bookkeeping ----
++        // (see "THE NAME OF AN IPO'S SHARES"; contractNames, name -> index, is declared with the other maps above). Appended here so that the layout of
++        // every field above is that of the build without a registry.
++        // contract index -> the share name BEGIN_EPOCH paired to it; 0 = none. Indices 1..30 are the embedded table's and are never written here.
++        // Written together with contractNames, once per index (an index has one IPO epoch).
++        Array<uint64, QPOOLK6_MAX_CONTRACT_INDEX + 1> indexNames;
++        // The success queue, appended by END_EPOCH and emptied by the next BEGIN_EPOCH: the contract indices (ascending) whose IPO ends in the epoch
++        // nameQueueEpoch with a full book, and the fingerprint of the final book of each (only when two or more are queued: with one, the pair is
++        // certain). Entries 0 .. nameQueueLen - 1 are in use.
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> nameQueue;
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> nameQueueFp;
++        uint64 nameQueueLen;
++        uint64 nameQueueEpoch;       // the epoch of the last queue fill (END_EPOCH's epoch): a second END_EPOCH call of the same epoch appends nothing
++        uint64 nameQueueOverflow;    // 1 = more indices than the queue holds ended with a full book (or a queue was found not emptied): the next pairing refuses
++        uint64 nameBaselineDone;     // 1 once BEGIN_EPOCH has recorded the baseline (the names that existed when it first ran)
++        uint64 namePairEpoch;        // the epoch of the last BEGIN_EPOCH that paired at least one name; 0 = never
++        uint64 namePaired;           // pairs written, in all
++        uint64 nameMismatches;       // epochs that were quarantined (counts differ, overflow, ambiguous books, walk bound): nothing was paired in them
++        uint64 nameLastMismatchEpoch;   // the evidence of the last quarantine: its epoch, the number of new names the walk found and of queued indices
++        uint64 nameLastMismatchNew;
++        uint64 nameLastMismatchQueued;
++
++        // ---- the automatic settlement of BEGIN_EPOCH (see "SETTLEMENT AT BEGIN_EPOCH"); appended, so no field above moves ----
++        uint64 autoSettleEpoch;      // the epoch of the last settlement pass (0 = never): one pass per epoch, a second BEGIN_EPOCH of the same epoch (a restart) does nothing
++        uint64 autoSettleDone;       // the holdings that pass settled
++        uint64 autoSettleSkipped;    // the holdings it handed to the routine and the routine refused (nothing was written for them)
++        uint64 autoSettleTotal;      // settled by BEGIN_EPOCH passes, in all
++        uint64 autoSettleCursor;     // the slot of ipoBids the next pass starts at: a pass that stops at its bound resumes after the last holding it tried, so holdings that are refused cannot keep the ones behind them waiting
+     };
+ 
+     // ======================== I/O structs ========================
+@@ -894,8 +1027,13 @@
+     struct KnownContractIndex_input { uint64 name; };
+     struct KnownContractIndex_output { uint64 index; };
+ 
+-    // Static part of the pairing check (table + one-to-one map). Safe to call anywhere,
+-    // including when an IPO holding is settled (the shares exist by then).
++    // The share name of a contract index: the embedded table's for 1..30, the registry's above (name 0 = none yet). source: 0 none, 1 the table, 2 the registry.
++    // Read-only, safe to call anywhere.
++    struct NameOfIndex_input { uint64 index; };
++    struct NameOfIndex_output { uint64 name; uint64 source; };
++    struct NameOfIndex_locals { KnownContractName_input nIn; KnownContractName_output nOut; };
++
++    // Pairing check (table + registry). Safe to call anywhere, including when an IPO holding is settled.
+     struct ContractPairKnown_input { uint64 index; uint64 assetName; };
+     struct ContractPairKnown_output { uint32 returnCode; };
+     struct ContractPairKnown_locals
+@@ -904,10 +1042,9 @@
+         KnownContractIndex_input iIn; KnownContractIndex_output iOut;
+         uint64 mapped;
+     };
+-    // Registration-time pairing check: the static part plus what the core can prove now.
+-    // ipo != 0: a bid in the contract's IPO (its shares cannot exist yet); ipo == 0:
+-    // shares that already exist (bought on QX or deposited).
+-    struct CheckContractPair_input { uint64 index; uint64 assetName; uint64 ipo; };
++    // Registration-time pairing check for shares that already exist (bought on QX or deposited): the pairing check plus what the core can prove now.
++    // (An IPO holding is registered without a name, so it has no pair to check.)
++    struct CheckContractPair_input { uint64 index; uint64 assetName; };
+     struct CheckContractPair_output { uint32 returnCode; };
+     struct CheckContractPair_locals
+     {
+@@ -951,7 +1088,6 @@
+     struct RegisterHolding_locals
+     {
+         SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
+-        uint64 isNew;
+     };
+ 
+     struct ApplyHolding_input
+@@ -967,10 +1103,11 @@
+     {
+         SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
+         SyncHolding_input sIn; SyncHolding_output sOut;
+-        uint128 scaled; uint64 bound;
++        uint128 scaled;
+         uint64 newShares; uint128 rem; uint64 remQu;
+     };
+ 
++    // assetName: the asset the ledger is bound to (0 = unbound: a CONTRACT ledger of an IPO that has not had a settlement that won shares yet).
+     struct GetSource_input { id source; uint64 kind; };
+     struct GetSource_output
+     {
+@@ -1028,6 +1165,29 @@
+         Array<uint64, QPOOLK6_MAX_IPO_BIDS> seatsAt;
+     };
+     struct GetIpoBids_locals { Holding h; IpoBids bids; };
++
++    // The registry of contract share names (function 10; see "THE NAME OF AN IPO'S SHARES"). Read-only.
++    //   Global: pairEpoch the epoch of the last BEGIN_EPOCH that paired a name (0 = never), paired the pairs written in all, queueLength the queue END_EPOCH
++    //   has filled and BEGIN_EPOCH has not emptied yet (0 whenever the chain is between epoch changes: it is empty except inside one), queueEpoch the epoch of the last
++    //   queue fill, overflow the queue's overflow flag, baselineDone 1 once the first BEGIN_EPOCH has run, mismatches the number of quarantined epochs and
++    //   lastMismatchEpoch / lastMismatchNew / lastMismatchQueued the evidence of the last one (its epoch, the new names the walk found, the indices queued).
++    //   For `index`: name = its share name (the embedded table's for 1..30, the registry's above; 0 = none yet) and nameSource 0 none, 1 table, 2 registry.
++    //   For `assetName`: nameState 0 = the registry does not know it, 1 = it is in the embedded table (nameIndex = its index), 2 = paired (nameIndex = the index
++    //   it is paired to), 3 = known, never paired (nameIndex 0: a baseline name or a name of a quarantined epoch).
++    struct GetNameRegistry_input { uint64 index; uint64 assetName; };
++    struct GetNameRegistry_output
++    {
++        uint64 pairEpoch; uint64 paired; uint64 queueLength; uint64 queueEpoch; uint64 overflow; uint64 baselineDone;
++        uint64 mismatches; uint64 lastMismatchEpoch; uint64 lastMismatchNew; uint64 lastMismatchQueued;
++        uint64 name; uint64 nameSource;
++        uint64 nameState; uint64 nameIndex;
++    };
++    struct GetNameRegistry_locals
++    {
++        NameOfIndex_input nxIn; NameOfIndex_output nxOut;
++        KnownContractIndex_input kiIn; KnownContractIndex_output kiOut;
++        uint64 mapped;
++    };
+ 
+     // ---- helpers of the immediate QX sale (KIND_SELL_QX) ----
+ 
+@@ -1087,6 +1247,18 @@
+     struct TakeBackRefund_input { uint64 amount; };
+     struct TakeBackRefund_output { uint32 unused; };
+ 
++    // ---- the record of a resting QX bid (private) ----
++    // The ledger of the asset keeps the limit price and the placing tick of the one QX bid that rests on it (SourceLedger::qxBidPrice, qxBidTick).
++    // NoteQxBid writes them (Execute, once a BUY_QX has left a remainder resting); ForgetQxBid clears them where the ledger has no pending bid any more
++    // (ReconcileHolding when the last share has filled, CancelQxBid). Both find the ledger from the holding's asset and payerIndex: only a TOKEN or
++    // a bought CONTRACT holding has a QX bid, never an IPO holding.
++    struct NoteQxBid_input { Asset asset; uint64 payerIndex; uint64 price; uint64 tick; };
++    struct NoteQxBid_output { uint32 unused; };
++    struct NoteQxBid_locals { SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led; };
++    struct ForgetQxBid_input { Asset asset; uint64 payerIndex; };
++    struct ForgetQxBid_output { uint32 unused; };
++    struct ForgetQxBid_locals { SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led; };
++
+     // The escrow of the ledger a holding earns from (0 when it has none), read without syncing.
+     struct HoldingEscrow_input { Asset asset; uint64 ipoContractIndex; uint64 payerIndex; };
+     struct HoldingEscrow_output { uint64 escrow; };
+@@ -1158,7 +1330,9 @@
+     struct CloseEmptyPool_output { uint32 returnCode; };
+     struct CloseEmptyPool_locals { Pool pool; Pool blank; };
+ 
+-    // BUY_IPO: asset = {NULL_ID, the target's share name}, holdingId = the target contract's index, quAmount = the BUDGET (the QU the pool
++    // BUY_IPO: asset = {NULL_ID, 0} (a BUY_IPO names no share asset: the name of the shares is read from the chain at the settlement, and a nonzero
++    // assetName is refused with INVALID_INPUT; an all-zero asset is the natural way to leave it out), holdingId = the target contract's index,
++    // quAmount = the BUDGET (the QU the pool
+     // allocates: the ONLY limit of the bidding, there is no voted quantity and no ceiling price), price = the OPENING price (the price of the
+     // first bid, a starting point shown to the voters: later bids may be at any price the money pays for, 1 .. 1,479,289,940,828), and the
+     // budget must buy at least one seat at it (quAmount >= price). `shares` is IGNORED for a BUY_IPO (any value is accepted; the field stays
+@@ -1223,6 +1397,7 @@
+         Array<uint64, QPOOLK6_MAX_CONTRIBUTORS_PER_POOL> memberCost;
+         BuyRefund_input refIn; BuyRefund_output refOut;
+         TakeBackRefund_input tbIn; TakeBackRefund_output tbOut;
++        NoteQxBid_input nqIn; NoteQxBid_output nqOut;
+         HoldingEscrow_input escIn; HoldingEscrow_output escOut;
+         uint64 refund; uint64 spent; uint64 prefix; uint64 cum; uint64 prevCum;
+         QSWAP::SwapExactQuForAsset_input swapBuyIn; QSWAP::SwapExactQuForAsset_output swapBuyOut;
+@@ -1277,9 +1452,11 @@
+     // his offer at any moment (OfferPosition overwrites it), and the attached QU only caps the PRICE; so the buyer states the PARCEL too, and
+     // the call is refused (OFFER_CHANGED, everything refunded, nothing written) unless it is exactly the live offer's (audit C033). 0 is never
+     // an offer's size, so a call that leaves it out -- a client of an earlier layout, whose 40-byte input the node pads with zeros -- is refused.
+-    // expectedShares: the holding's real backing the buyer read (GetPosition(holdingId, seller).offeredShares), i.e. Offer.sharesSnapshot.
+-    // A sale between the buyer's read and this call shrinks the holding's shares without touching costUnits or askPrice (F-02 fix), so this
+-    // is checked the same way: refused (OFFER_CHANGED) unless it still matches.
++    // expectedShares: the holding's recorded shares the buyer read (GetPosition(holdingId, seller).offeredShares, which is the holding's LIVE
++    // Holding.shares while the offer exists; GetHolding(holdingId).shares is the same number). A sale or a reconcile between the buyer's read
++    // and this call changes the shares backing the seat without touching costUnits or askPrice (F-02 fix), so this is checked the same way:
++    // refused (OFFER_CHANGED) unless it is still the holding's shares NOW. No copy of the shares is stored with the offer, so a buyer who
++    // reads GetPosition again after any change gets a number that works, and the seller does not have to re-offer.
+     struct BuyPosition_input { uint64 holdingId; id seller; uint64 expectedCostUnits; uint64 expectedShares; };
+     struct BuyPosition_output { uint32 returnCode; uint64 costUnitsBought; };
+     struct BuyPosition_locals
+@@ -1302,6 +1479,7 @@
+         SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
+         ApplyHolding_input apIn; ApplyHolding_output apOut;
+         uint64 unclaimed; uint64 newClaim;
++        ForgetQxBid_input fqIn; ForgetQxBid_output fqOut;
+     };
+ 
+     // RebidIpo (procedure id 13; deleted in K2 and reinstated by the owner's final IPO decision D1): a further bid for an unsettled IPO
+@@ -1386,9 +1564,13 @@
+     // counts stale between calls and would hand every caller a pass over the book at the fee reserve's expense. The id stays reserved:
+     // nothing is registered under it and no later procedure may take it.
+ 
+-    struct SettleIpo_input { uint64 holdingId; };
+-    struct SettleIpo_output { uint32 returnCode; uint64 shares; uint64 returnedToMembers; };
+-    struct SettleIpo_locals
++    // The settlement of ONE IPO holding, written once (SettleHolding, a private procedure) and called by two callers: the user procedure SettleIpo
++    // (permissionless, the manual backup) and BEGIN_EPOCH (the automatic settlement). Same input, same output, same return codes either way. It moves
++    // no QU out of the contract: everything it does is bookkeeping (members' balances inside the contract, the refund pot, the ledger); the one QU
++    // transfer of the manual call, the refund of an attached invocation reward, is SettleIpo's own first line and is not in here.
++    struct SettleHolding_input { uint64 holdingId; };
++    struct SettleHolding_output { uint32 returnCode; uint64 shares; uint64 returnedToMembers; };
++    struct SettleHolding_locals
+     {
+         Holding h; Pool pool; ContribKey ck; Contribution c; OwnKey ok; Ownership own;
+         uint64 i; uint64 base; uint64 refundEach; uint64 returned; uint64 leftover;
+@@ -1397,12 +1579,15 @@
+         uint128 pending; OfferKey fk;
+         SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
+         ApplyHolding_input apIn; ApplyHolding_output apOut;
+-        ContractPairKnown_input pairIn; ContractPairKnown_output pairOut;
++        NameOfIndex_input nameIn; NameOfIndex_output nameOut;
+         uint64 myShare; uint64 proven; IpoPriceKey ipoKey; IpoSeat seat;
+         IpoRowOf_input rowIn; IpoRowOf_output rowOut; IpoTarget row; uint64 rowIdx;
+         IpoBids bids; uint64 j; uint64 seatsWon; uint64 spentOnSeats; uint64 valueOfSeats;
+         uint64 dropped; uint64 offersDropped; uint64 freed;      // seat rows and offers removed by this call, and whether the holding's slot is free again
+     };
++    struct SettleIpo_input { uint64 holdingId; };
++    struct SettleIpo_output { uint32 returnCode; uint64 shares; uint64 returnedToMembers; };
++    struct SettleIpo_locals { SettleHolding_input sIn; SettleHolding_output sOut; };
+ 
+     struct GetPool_input { uint64 poolId; };
+     struct GetPool_output
+@@ -1421,6 +1606,7 @@
+     struct GetMember_locals { ContribKey key; Contribution c; };
+ 
+     struct GetHolding_input { uint64 holdingId; };
++    // assetName of an IPO holding is 0 until its settlement (BEGIN_EPOCH or SettleIpo) has bound the name the chain gave the shares (and stays 0 for a holding that won no seat).
+     struct GetHolding_output
+     {
+         uint32 found; uint64 poolId; id issuer; uint64 assetName;
+@@ -1431,6 +1617,7 @@
+         uint64 ipoSettled; uint64 sourceEscrow;
+         uint64 payerIndex;
+         uint64 rows;      // seat rows that exist for the holding
++        uint64 qxBidPrice; uint64 qxBidTick;   // the QX bid this holding has resting (pendingShares > 0): its limit price and the tick it was placed at; 0 and 0 otherwise
+     };
+     struct GetHolding_locals
+     {
+@@ -1442,7 +1629,8 @@
+     struct GetPosition_output
+     {
+         uint32 found; uint64 cost; uint64 costBasis; uint64 owed;
+-        uint64 offeredCostUnits; uint64 askPrice; uint64 offeredShares;
++        uint64 offeredCostUnits; uint64 askPrice;
++        uint64 offeredShares;       // the holding's LIVE shares while an offer exists (0 without one): the value BuyPosition's expectedShares must carry
+         uint64 voteLockUntilTick;   // the seat cannot be offered or sold while qpi.tick() <= this (0 or a past tick: free)
+     };
+     struct GetPosition_locals
+@@ -1472,7 +1660,14 @@
+         uint64 totalDistributedToShareholders; uint64 totalBurned;
+         uint64 dividendEscrowTotal; uint64 totalUnownedSwept;
+         uint64 qpayBuyPot; uint64 qpayUnburned; uint64 totalQpayhubDeposited; uint64 totalQpaySpent; uint64 totalQpayBurned;
++        // The automatic settlement (appended: the fields above keep their place). readyUnsettled: the IPO holdings that are ready to settle and have not
++        // been settled, counted now (the unsettled holdings of every target whose snapshot exists and whose epoch is over; a holding that is ready but waits
++        // for a name, or is refused for another reason, is counted too). A keeper needs to call SettleIpo only while it is above 0 and the pass of the
++        // last BEGIN_EPOCH (autoSettleEpoch, 0 = none yet) either hit its bound (autoSettleDone + autoSettleSkipped == QPOOLK6_AUTO_SETTLE_MAX) or skipped holdings
++        // (autoSettleSkipped above 0: nothing was written for them, SettleIpo returns the reason). autoSettleTotal: settled by BEGIN_EPOCH passes, in all.
++        uint64 readyUnsettled; uint64 autoSettleEpoch; uint64 autoSettleDone; uint64 autoSettleSkipped; uint64 autoSettleTotal;
+     };
++    struct GetStats_locals { IpoTarget row; uint64 t; };
+ 
+     // ======================== Functions ========================
+ 
+@@ -1615,13 +1810,33 @@
+         if (input.name == 92639312630865ULL) { output.index = 30; return; } // QTREAT
+     }
+ 
+-    // Static pairing check for contract shares: is `assetName` plausibly the share asset of
+-    // contract `index`? Read-only; no call into the core. What it can and cannot prove:
++    // The share name of contract `index`: the embedded table's for 1..QPOOLK6_KNOWN_CONTRACTS, the registry's (indexNames) above. 0 = the
++    // registry has not paired a name to this index (yet). Read-only; no call into the core.
++    PRIVATE_FUNCTION_WITH_LOCALS(NameOfIndex)
++    {
++        output.name = 0;
++        output.source = 0;
++        if (input.index == 0 || input.index > QPOOLK6_MAX_CONTRACT_INDEX) return;
++        if (input.index <= QPOOLK6_KNOWN_CONTRACTS)
++        {
++            locals.nIn.index = input.index;
++            CALL(KnownContractName, locals.nIn, locals.nOut);
++            output.name = locals.nOut.name;
++            if (output.name != 0) output.source = 1;
++            return;
++        }
++        output.name = state.get().indexNames.get(input.index);
++        if (output.name != 0) output.source = 2;
++    }
++
++    // Pairing check for contract shares: is `assetName` the share asset of contract `index`? Read-only; no call into the core. What it
++    // proves:
+     //   - index 1..QPOOLK6_KNOWN_CONTRACTS: the pair must match the embedded table EXACTLY;
+-    //   - any index: a name the table lists for ANOTHER index is refused;
+-    //   - index above the table: a name already bound (contractNames) to another index is
+-    //     refused. For a name nobody has bound yet nothing on chain can say which contract
+-    //     it belongs to; the first registration binds it (see RegisterHolding / ApplyHolding).
++    //   - any index: a name the table lists for ANOTHER index is refused (CONTRACT_MISMATCH);
++    //   - index above the table: the pair must be in the REGISTRY (contractNames), which BEGIN_EPOCH fills from the chain's own events and nothing
++    //     else does. A name paired to ANOTHER index is refused (CONTRACT_MISMATCH); a name the registry does not know, or knows without a pair
++    //     (a baseline name, a name of a quarantined epoch), is refused (NAME_PENDING): nothing on chain says which contract it belongs to.
++    //     Nobody can claim, squat or poison a name: no call of a user writes the registry.
+     // The index itself must be a possible contract index and not QPOOL's own.
+     PRIVATE_FUNCTION_WITH_LOCALS(ContractPairKnown)
+     {
+@@ -1644,21 +1859,17 @@
+         {
+             output.returnCode = QPOOLK6_ERR_CONTRACT_MISMATCH; return;      // a listed contract's name
+         }
+-        if (state.get().contractNames.get(input.assetName, locals.mapped) && locals.mapped != input.index)
++        if (!state.get().contractNames.get(input.assetName, locals.mapped) || locals.mapped == 0)
+         {
+-            output.returnCode = QPOOLK6_ERR_CONTRACT_MISMATCH; return;      // already bound to another index
++            output.returnCode = QPOOLK6_ERR_NAME_PENDING; return;           // not in the registry, or known and never paired
+         }
++        if (locals.mapped != input.index) output.returnCode = QPOOLK6_ERR_CONTRACT_MISMATCH;      // paired to another index
+     }
+ 
+-    //   ipo == 0 (shares that already exist: a QX purchase or a deposit): above the table, the
+-    //     contract index must be a registered contract that is NOT in its IPO epoch
+-    //     (qpi.ipoBidPrice: -1 no such contract, -2 registered and not in its IPO epoch, >= 0 in its
+-    //     IPO). NOTE: -2 also covers a contract whose IPO has not started yet, so this does NOT rule
+-    //     out squatting the index of a registered but not yet live contract (shown by a probe).
+-    //     contract whose shares cannot exist yet.
+-    //   ipo != 0 (a bid in the contract's IPO): the declared name must NOT already be an
+-    //     issued asset. The IPO's own shares do not exist before the IPO ends, so an issued
+-    //     name is some other contract's, and an honest declaration is never refused.
++    //   Above the table the contract index must be a registered contract that is NOT in its IPO epoch
++    //   (qpi.ipoBidPrice: -1 no such contract, -2 registered and not in its IPO epoch, >= 0 in its
++    //   IPO). A pair in the registry already means that the IPO ended (the shares exist), so this is a second,
++    //   independent read of the same fact. (-2 also covers a contract whose IPO has not started yet.)
+     // Procedures only (the core read takes the target contract's state lock while it is in
+     // its IPO epoch); never from a PUBLIC_FUNCTION.
+     PRIVATE_FUNCTION_WITH_LOCALS(CheckContractPair)
+@@ -1669,11 +1880,6 @@
+         CALL(ContractPairKnown, locals.kIn, locals.kOut);
+         if (locals.kOut.returnCode != QPOOLK6_OK) { output.returnCode = locals.kOut.returnCode; return; }
+         if (input.index <= QPOOLK6_KNOWN_CONTRACTS) return;
+-        if (input.ipo != 0)
+-        {
+-            if (qpi.isAssetIssued(NULL_ID, input.assetName)) output.returnCode = QPOOLK6_ERR_CONTRACT_MISMATCH;
+-            return;
+-        }
+         locals.phase = qpi.ipoBidPrice((uint32)input.index, 0);
+         if (locals.phase != -2) output.returnCode = QPOOLK6_ERR_CONTRACT_NOT_LIVE;
+     }
+@@ -1698,12 +1904,12 @@
+         {
+             output.returnCode = QPOOLK6_ERR_SOURCE_CONFLICT; return;
+         }
+-        if (locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT)
++        if (locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT && input.ipoContractIndex == 0)
+         {
+-            // Contract shares: does this name belong to this contract? (see CheckContractPair)
++            // Bought or deposited contract shares: does this name belong to this contract? (see CheckContractPair: the table or the registry.)
++            // An IPO holding names no asset (its name is read from the chain when it settles), so it has no pair to check.
+             locals.pIn.index = locals.kout.contractIndex;
+             locals.pIn.assetName = input.asset.assetName;
+-            locals.pIn.ipo = (input.ipoContractIndex != 0) ? 1 : 0;
+             CALL(CheckContractPair, locals.pIn, locals.pOut);
+             if (locals.pOut.returnCode != QPOOLK6_OK) { output.returnCode = locals.pOut.returnCode; return; }
+         }
+@@ -1758,15 +1964,6 @@
+         {
+             output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+         }
+-        // A new bound CONTRACT ledger above the table also needs a contractNames entry. The
+-        // table cannot actually fill (one entry per contract index), but a registration must
+-        // never half-succeed, so refuse before anything moves.
+-        if (locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT && input.ipoContractIndex == 0
+-            && locals.kout.contractIndex > QPOOLK6_KNOWN_CONTRACTS
+-            && state.get().contractNames.population() >= QPOOLK6_MAX_CONTRACT_NAMES)
+-        {
+-            output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+-        }
+     }
+ 
+     // Pure arithmetic shared by SyncHolding (writes) and GetPosition (reads).
+@@ -1855,13 +2052,11 @@
+         locals.kin.payerIndex = input.h.payerIndex;
+         CALL(SourceKeyOf, locals.kin, locals.kout);
+         if (locals.kout.valid == 0) { output.returnCode = QPOOLK6_ERR_INVALID_INPUT; return; }
+-        locals.isNew = 0;
+         if (!state.get().sources.get(locals.kout.key, locals.led))
+         {
+-            // An IPO source is bound by its first settlement that wins shares; a TOKEN
+-            // source, or a CONTRACT source created by bought or deposited shares (whose
+-            // shares exist already), is bound now.
+-            locals.isNew = 1;
++            // An IPO source is bound by its first settlement that wins shares (to the name the registry
++            // holds for its index); a TOKEN source, or a CONTRACT source created by bought or deposited
++            // shares (whose shares exist already), is bound now.
+             locals.led.assetName = (input.h.ipoContractIndex != 0) ? 0 : input.h.asset.assetName;
+             locals.led.bindEpoch = qpi.epoch();         // how long this binding has stood (EvictSquat)
+         }
+@@ -1897,25 +2092,6 @@
+         {
+             output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+         }
+-        // A new bound CONTRACT ledger above the embedded table claims its asset name for its
+-        // index (one-to-one, see ContractPairKnown), AT REGISTRATION -- including an IPO ledger
+-        // (F-01 fix): the declared name is claimed the instant the first holding bids on this
+-        // index, not deferred to settlement. Deferring it let two different unlisted targets
+-        // both bid under the SAME declared name (neither is issued yet, so CheckContractPair's
+-        // ipo!=0 path could not refuse either) and race at SettleIpo: whichever side settled
+-        // first silently bound the universe-wide name and "proved" its seats against the OTHER
+-        // target's real shares, leaving the honest side's later, correct settlement refused
+-        // (NAME_UNPROVEN) with its capital stuck. Binding here instead means the SECOND
+-        // registration to use a name already claimed by a different index is refused immediately
+-        // by CheckSource -- before either side's auction ever receives real capital.
+-        if (locals.isNew != 0
+-            && locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT && locals.kout.contractIndex > QPOOLK6_KNOWN_CONTRACTS)
+-        {
+-            if (state.mut().contractNames.set(input.h.asset.assetName, locals.kout.contractIndex) == NULL_INDEX)
+-            {
+-                output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+-            }
+-        }
+     }
+ 
+     // THE choke point for changing what a holding earns on. Every change to
+@@ -1968,15 +2144,15 @@
+         }
+         output.h.shares = locals.newShares;
+         output.h.pendingShares = input.newPending;
+-        locals.bound = 0;
+         if (input.markSettled != 0)
+         {
+             output.h.ipoSettled = 1;
+             if (locals.led.unsettled > 0) locals.led.unsettled = locals.led.unsettled - 1;
++            // SettleIpo has put the name the registry holds for the ledger's index into the holding's asset: the ledger is bound to it
++            // by the first settlement that wins shares (a holding that won none keeps no name and binds nothing).
+             if (locals.newShares > 0 && locals.led.assetName == 0)
+             {
+                 locals.led.assetName = output.h.asset.assetName;
+-                locals.bound = 1;
+             }
+         }
+         if (input.retire != 0)
+@@ -2047,24 +2223,12 @@
+                         ? state.get().totalPayoutsDistributed - locals.remQu : 0;
+                 }
+             }
++            // (The registry is not touched: a name's pair is a fact about the chain, it does not live and die with a ledger.)
+             state.mut().sources.removeByKey(locals.kout.key);
+-            // The ledger is gone, so is its claim on its asset name.
+-            if (locals.led.assetName != 0 && locals.kout.contractIndex > QPOOLK6_KNOWN_CONTRACTS
+-                && locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT)
+-            {
+-                state.mut().contractNames.removeByKey(locals.led.assetName);
+-            }
+         }
+         else
+         {
+             state.mut().sources.set(locals.kout.key, locals.led);
+-            // An IPO ledger claims its asset name for its index at the first settlement that
+-            // wins shares (SettleIpo has already checked it is free, see ContractPairKnown).
+-            if (locals.bound != 0 && locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT
+-                && locals.kout.contractIndex > QPOOLK6_KNOWN_CONTRACTS)
+-            {
+-                state.mut().contractNames.set(locals.led.assetName, locals.kout.contractIndex);
+-            }
+         }
+         state.mut().holdings.set(input.holdingId, output.h);
+     }
+@@ -2220,6 +2384,35 @@
+         }
+     }
+ 
++    // Record the QX bid that has just been left resting on a ledger (see SourceLedger::qxBidPrice). Call it after RegisterHolding, with the
++    // limit price the bid was placed at and the current tick. A ledger that is not there (it always is, RegisterHolding has just made it) is left alone.
++    PRIVATE_PROCEDURE_WITH_LOCALS(NoteQxBid)
++    {
++        locals.kin.asset = input.asset;
++        locals.kin.ipoContractIndex = 0;
++        locals.kin.payerIndex = input.payerIndex;
++        CALL(SourceKeyOf, locals.kin, locals.kout);
++        if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led)) return;
++        locals.led.qxBidPrice = input.price;
++        locals.led.qxBidTick = (uint32)input.tick;
++        state.mut().sources.set(locals.kout.key, locals.led);
++    }
++
++    // Clear the record of a resting bid once the ledger has no pending bid left (pendingQx is the authority: a bid that is still resting keeps its
++    // record). Writes only when there is a record to clear, so a call that finds none does not dirty the state.
++    PRIVATE_PROCEDURE_WITH_LOCALS(ForgetQxBid)
++    {
++        locals.kin.asset = input.asset;
++        locals.kin.ipoContractIndex = 0;
++        locals.kin.payerIndex = input.payerIndex;
++        CALL(SourceKeyOf, locals.kin, locals.kout);
++        if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led)) return;
++        if (locals.led.pendingQx != 0 || (locals.led.qxBidPrice == 0 && locals.led.qxBidTick == 0)) return;
++        locals.led.qxBidPrice = 0;
++        locals.led.qxBidTick = 0;
++        state.mut().sources.set(locals.kout.key, locals.led);
++    }
++
+     // The escrow parked on a holding's source, or 0. Read-only: sales use it to refuse BEFORE anything is
+     // written (escrowed dividends belong to whoever held the shares when they arrived).
+     PRIVATE_FUNCTION_WITH_LOCALS(HoldingEscrow)
+@@ -2355,6 +2548,12 @@
+         if (locals.kout.valid != 0 && state.get().sources.get(locals.kout.key, locals.led))
+         {
+             output.sourceEscrow = locals.led.escrow;
++            // The QX bid this holding has resting: the ledger records it (one per ledger), and only the holding that has pendingShares owns it.
++            if (locals.h.pendingShares > 0 && locals.h.ipoContractIndex == 0)
++            {
++                output.qxBidPrice = locals.led.qxBidPrice;
++                output.qxBidTick = locals.led.qxBidTick;
++            }
+             // Show the payouts the holding would credit itself right now, so the view
+             // agrees with GetPosition / ClaimPayout between syncs.
+             locals.mIn.h = locals.h;
+@@ -2396,7 +2595,7 @@
+         {
+             output.offeredCostUnits = locals.f.costUnits;
+             output.askPrice = locals.f.askPrice;
+-            output.offeredShares = locals.f.sharesSnapshot;
++            output.offeredShares = locals.h.shares;       // live, not a copy taken when the offer was written (see BuyPosition_input)
+         }
+     }
+ 
+@@ -2422,7 +2621,7 @@
+         output.status = locals.p.status;
+     }
+ 
+-    PUBLIC_FUNCTION(GetStats)
++    PUBLIC_FUNCTION_WITH_LOCALS(GetStats)
+     {
+         output.poolCount = state.get().poolCount;
+         output.holdingCount = state.get().holdingCount;
+@@ -2445,6 +2644,21 @@
+         output.totalQpayhubDeposited = state.get().totalQpayhubDeposited;
+         output.totalQpaySpent = state.get().totalQpaySpent;
+         output.totalQpayBurned = state.get().totalQpayBurned;
++        // The ready, unsettled IPO holdings: the unsettled count of every target row whose snapshot exists and whose epoch has moved on (the same
++        // test SettleHolding makes). Reads the table of targets only; the universe is not touched (a function must not).
++        output.readyUnsettled = 0;
++        for (locals.t = 0; locals.t < QPOOLK6_MAX_IPO_TARGETS; locals.t++)
++        {
++            locals.row = state.get().ipoTargets.get(locals.t);
++            if (locals.row.ipoContractIndex != 0 && locals.row.snapshotEpoch != 0 && (uint64)qpi.epoch() > locals.row.snapshotEpoch)
++            {
++                output.readyUnsettled = sadd(output.readyUnsettled, locals.row.unsettled);
++            }
++        }
++        output.autoSettleEpoch = state.get().autoSettleEpoch;
++        output.autoSettleDone = state.get().autoSettleDone;
++        output.autoSettleSkipped = state.get().autoSettleSkipped;
++        output.autoSettleTotal = state.get().autoSettleTotal;
+     }
+ 
+     PUBLIC_FUNCTION_WITH_LOCALS(GetSource)
+@@ -2503,6 +2717,38 @@
+         output.count = locals.bids.count;
+         output.prices = locals.bids.prices;
+         output.seatsAt = locals.bids.seatsAt;
++    }
++
++    // The registry of contract share names: the global state of the pairing, the name of `index`, and what the registry knows of `assetName`.
++    // See GetNameRegistry_output.
++    PUBLIC_FUNCTION_WITH_LOCALS(GetNameRegistry)
++    {
++        output.pairEpoch = state.get().namePairEpoch;
++        output.paired = state.get().namePaired;
++        output.queueLength = state.get().nameQueueLen;
++        output.queueEpoch = state.get().nameQueueEpoch;
++        output.overflow = state.get().nameQueueOverflow;
++        output.baselineDone = state.get().nameBaselineDone;
++        output.mismatches = state.get().nameMismatches;
++        output.lastMismatchEpoch = state.get().nameLastMismatchEpoch;
++        output.lastMismatchNew = state.get().nameLastMismatchNew;
++        output.lastMismatchQueued = state.get().nameLastMismatchQueued;
++        locals.nxIn.index = input.index;
++        CALL(NameOfIndex, locals.nxIn, locals.nxOut);
++        output.name = locals.nxOut.name;
++        output.nameSource = locals.nxOut.source;
++        if (input.assetName == 0 || input.assetName > QPOOLK6_MAX_ASSET_NAME) return;
++        locals.kiIn.name = input.assetName;
++        CALL(KnownContractIndex, locals.kiIn, locals.kiOut);
++        if (locals.kiOut.index != 0)
++        {
++            output.nameState = 1;
++            output.nameIndex = locals.kiOut.index;
++            return;
++        }
++        if (!state.get().contractNames.get(input.assetName, locals.mapped)) return;
++        output.nameState = (locals.mapped != 0) ? 2 : 3;
++        output.nameIndex = locals.mapped;
+     }
+ 
+     // ======================== Pool membership ========================
+@@ -2952,9 +3198,14 @@
+         // QPOOLK6_IPO_PROPOSAL_LIFETIME for a BUY_IPO, QPOOLK6_PROPOSAL_LIFETIME otherwise; the two constants are used inline because a
+         // CALL per slot of this scan would cost more than the scan), so its proposer is not held up by a housekeeping call nobody has a
+         // reason to make (C076).
++        // The scan stops at the first never-used slot (kind == 0) because the used slots always form a PREFIX of the array:
++        // kind is written non-zero only by the slot write at the end of this procedure, nothing writes kind = 0 or frees a slot
++        // in the middle (Vote, Tally and Execute change only the weights and the status of a slot whose kind is non-zero), and
++        // the slot search below takes the LOWEST reusable slot, which is at or below the first unused one. So the cost is the
++        // number of slots in use at once, not QPOOLK6_MAX_PROPOSALS. Keep this invariant if a writer of the array is ever added.
+         for (locals.i = 0; locals.i < QPOOLK6_MAX_PROPOSALS; locals.i++)
+         {
+-            if (state.get().proposals.get(locals.i).kind == 0) continue;
++            if (state.get().proposals.get(locals.i).kind == 0) break;
+             if (state.get().proposals.get(locals.i).poolId != input.poolId) continue;
+             if (state.get().proposals.get(locals.i).proposer != qpi.invocator()) continue;
+             locals.slotStatus = state.get().proposals.get(locals.i).status;
+@@ -3009,11 +3260,11 @@
+             // bidInIPO requires SELF_INDEX < IPOContractIndex, so a pool can
+             // only bid on contracts registered AFTER it.
+             //
+-            // The proposal must also carry the target's share-asset name in
+-            // asset.assetName (issuer NULL_ID, because contract shares are
+-            // protocol-issued). Contracts cannot read contractDescriptions —
+-            // it is defined after the contract includes precisely to keep it
+-            // out of reach — so the name has to come from the vote.
++            // The proposal carries NO share name: the target is its contract index (holdingId), and the name of the shares
++            // the core will issue is read from the chain when the holding settles (see "THE NAME OF AN IPO'S SHARES"; contracts
++            // cannot read contractDescriptions, so a name typed here could only be taken on trust). asset.assetName must be 0
++            // and asset.issuer NULL_ID (an all-zero asset): anything else is refused, so that a name that is typed cannot
++            // be mistaken for one that is read.
+             //
+             // What the members vote is MONEY (owner decision D1, final): quAmount is the budget, the QU the pool allocates, and it is the
+             // ONLY limit of the bidding. There is no voted quantity and no ceiling price: the higher the price goes the fewer seats the
+@@ -3029,7 +3280,7 @@
+             // buys no seat at all: refused here.
+             if (input.price == 0 || input.price > QPOOLK6_IPO_MAX_PRICE
+                 || input.holdingId <= (uint64)SELF_INDEX || input.holdingId > QPOOLK6_MAX_CONTRACT_INDEX
+-                || input.asset.assetName == 0 || input.asset.issuer != NULL_ID
++                || input.asset.assetName != 0 || input.asset.issuer != NULL_ID
+                 || input.quAmount < input.price || input.quAmount > locals.pool.uncommittedTotal)
+             {
+                 output.returnCode = QPOOLK6_ERR_INVALID_INPUT; return;
+@@ -3062,10 +3313,9 @@
+             {
+                 output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+             }
+-            // One asset per paying contract: a second pool bidding on the same
+-            // IPO must name the same share asset. CheckSource also refuses a name that
+-            // cannot be this contract's (listed for another index, already claimed by another
+-            // ledger, or already an issued asset: the IPO's own shares do not exist yet).
++            // The target's dividend ledger takes the holding (a ledger that cannot, a full payer table, is refused now rather
++            // than after the vote). There is no name to check: every pool bidding on the same IPO ends up with the one name
++            // the chain issues, whatever it is.
+             locals.srcIn.asset = input.asset;
+             locals.srcIn.ipoContractIndex = input.holdingId;
+             locals.srcIn.payerIndex = 0;
+@@ -3463,9 +3713,12 @@
+                 // The proposal is checked again, as it will be multiplied and narrowed by the core (audit C001): a
+                 // proposal only gets here through Propose, which refuses all of this, but the core takes
+                 // price x quantity from the WHOLE contract balance, so nothing is taken on trust.
+-                // (The proposal carries a budget and an opening price and nothing else: the quantity is what the money buys, below.)
++                // (The proposal carries a budget and an opening price and nothing else: the quantity is what the money buys, below,
++                // and the holding is created WITHOUT a share name -- the proposal's asset is {NULL_ID, 0}, as Propose requires --
++                // which the settlement reads from the chain.)
+                 if (locals.p.price == 0 || locals.p.price > QPOOLK6_IPO_MAX_PRICE
+                     || locals.p.holdingId <= (uint64)SELF_INDEX || locals.p.holdingId > QPOOLK6_MAX_CONTRACT_INDEX
++                    || locals.p.asset.assetName != 0 || locals.p.asset.issuer != NULL_ID
+                     || locals.p.quAmount < locals.p.price)
+                 {
+                     output.returnCode = QPOOLK6_ERR_INVALID_INPUT; return;
+@@ -3477,12 +3730,22 @@
+                     output.returnCode = QPOOLK6_ERR_IPO_REJECTED; return;
+                 }
+                 // The binding price check: no other live holding of this IPO may bid at this price (its slots in the
+-                // book would be indistinguishable from this holding's). A proposal that loses this race stays PASSED
+-                // and can never win it back while the other holding is unsettled, so it simply expires.
++                // book would be indistinguishable from this holding's). A proposal that loses this race is closed (FAILED)
++                // once, releasing its proposer and its YES voters, exactly like a mandate whose funded part buys no seat
++                // (below), instead of staying PASSED with its voters locked until it expires. The price can come free again
++                // (the other holding drops it when a RebidIpo of its own leaves it without a seat there); the pool then proposes anew.
+                 locals.ipoKey.ipoContractIndex = locals.p.holdingId;
+                 locals.ipoKey.price = locals.p.price;
+                 if (state.get().ipoPrices.contains(locals.ipoKey))
+                 {
++                    locals.p.status = QPOOLK6_PROP_FAILED;
++                    state.mut().proposals.set(input.proposalId, locals.p);
++                    locals.rvIn.slot = input.proposalId;
++                    locals.rvIn.poolId = locals.p.poolId;
++                    locals.rvIn.kind = locals.p.kind;
++                    locals.rvIn.openTick = locals.p.openTick;
++                    locals.rvIn.which = 0;
++                    CALL(ReleaseVotes, locals.rvIn, locals.rvOut);
+                     output.returnCode = QPOOLK6_ERR_IPO_PRICE_TAKEN; return;
+                 }
+                 if (state.get().ipoPrices.population() >= QPOOLK6_MAX_IPO_PRICES
+@@ -3725,7 +3988,8 @@
+                 // Order-book buy. QX matches the bid against resting asks inside this
+                 // call and delivers those shares at once; the rest of the order rests
+                 // and fills later, silently, so it is held as pendingShares until
+-                // ReconcileHolding.
++                // ReconcileHolding (or CancelQxBid, which takes it back). The ledger
++                // records the resting order's price and tick below, after RegisterHolding.
+                 locals.heldBefore = qpi.numberOfShares(locals.p.asset,
+                     AssetOwnershipSelect::byOwner(SELF), AssetPossessionSelect::byPossessor(SELF));
+                 locals.qxBidIn.issuer = locals.p.asset.issuer;
+@@ -3769,11 +4033,13 @@
+             }
+             else
+             {
+-                // IPO bid. holdingId carries the target contract index, and the
+-                // asset is {NULL_ID, shareAssetName} from the proposal. The FIRST bid, ALL-IN at the voted opening price: as many seats as
++                // IPO bid. holdingId carries the target contract index, and the holding's asset is {NULL_ID, 0}: its
++                // name is bound by SettleIpo, from the registry. The FIRST bid, ALL-IN at the voted opening price: as many seats as
+                 // the funded money buys at it, at most 676 (inside the core's limits: the price was checked at the top of this branch
+-                // and quantity <= 676, so price x quantity <= assigned never wraps). The rest of the money (less than one seat at the
+-                // opening price) is the holding's free funds; later bids (RebidIpo) are funded by free funds alone, at any price they pay for.
++                // and quantity <= 676, so price x quantity <= assigned never wraps). The rest of the money is the holding's free funds:
++                // less than one seat at the opening price when the money bought fewer than 676 seats, but MORE than one seat (when the
++                // 676 cap bites, a budget above 676 x the opening price leaves the excess unbid) when it bought 676. Later bids (RebidIpo)
++                // are funded by free funds alone, at any price they pay for, so that excess can be rebid at once.
+                 locals.h.ipoContractIndex = locals.p.holdingId;
+                 locals.h.ipoMaxPrice = locals.p.price;
+                 locals.h.ipoAvailable = locals.assigned;
+@@ -3860,6 +4126,16 @@
+             locals.regIn.h = locals.h;
+             CALL(RegisterHolding, locals.regIn, locals.regOut);
+             locals.h = locals.regOut.h;
++            // A BUY_QX that left a remainder resting on QX: the ledger records the order's limit price and the tick it was placed at, which is what
++            // CancelQxBid names to QX and measures the age limit from (CheckSource guaranteed that no other bid of this ledger rests).
++            if (locals.p.kind == QPOOLK6_KIND_BUY_QX && locals.h.pendingShares > 0)
++            {
++                locals.nqIn.asset = locals.h.asset;
++                locals.nqIn.payerIndex = locals.h.payerIndex;
++                locals.nqIn.price = locals.p.price;
++                locals.nqIn.tick = (uint64)qpi.tick();
++                CALL(NoteQxBid, locals.nqIn, locals.nqOut);
++            }
+ 
+             // PASS 2 (writes): move each member's buy-in from uncommitted to committed
+             // and record their seat in the new holding.
+@@ -4410,7 +4686,9 @@
+     // draw is still capped at this holding's own pendingShares, which makes repeated
+     // calls idempotent and keeps stray donated shares from being over-claimed.
+     // The dividends the hook set aside for those fills (escrow) are paid to this
+-    // holding in the same step.
++    // holding in the same step. When the last share of the bid has filled, the
++    // ledger's record of the bid (price and placing tick) is cleared; a bid that has
++    // not filled can be taken back with CancelQxBid.
+     PUBLIC_PROCEDURE_WITH_LOCALS(ReconcileHolding)
+     {
+         if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
+@@ -4455,9 +4733,337 @@
+             locals.apIn.retire = 0;
+             CALL(ApplyHolding, locals.apIn, locals.apOut);
+             locals.h = locals.apOut.h;
++            // The last share of the bid has filled: its record (price and placing tick) goes from the ledger. A bid that still rests keeps it.
++            if (locals.h.pendingShares == 0)
++            {
++                locals.fqIn.asset = locals.h.asset;
++                locals.fqIn.payerIndex = locals.h.payerIndex;
++                CALL(ForgetQxBid, locals.fqIn, locals.fqOut);
++            }
+         }
+         output.shares = locals.h.shares;
+         output.pendingShares = locals.h.pendingShares;
++        output.returnCode = QPOOLK6_OK;
++    }
++
++    // ======================== CancelQxBid ========================
++    // Take back the QX bid that a BUY_QX left resting (procedure id 23). See "BUYING ON QX" at the top for the design.
++    //
++    // WHO. The creator of the pool that owns the holding, or a seat owner of the holding (an Ownership row of the caller with a nonzero cost: the
++    // people who funded the bid, or bought their seat from one of them), at any time; or ANYBODY once the bid has rested for more than
++    // QPOOLK6_QX_BID_MAX_AGE_TICKS since the tick it was placed at (SourceLedger::qxBidTick), so that a stale bid cannot block the payer's ledger for
++    // ever. Anybody else: NOT_AUTHORIZED. Whoever calls, the QU goes to the seat owners, never to the caller.
++    //
++    // WHAT. The holding's fills are counted first, as ReconcileHolding counts them (shares of the asset QPOOL holds that no ledger has recognised yet,
++    // at most the holding's pendingShares), but as a READ: if every share has filled there is nothing to cancel (NO_PENDING_BID, nothing written; a
++    // ReconcileHolding credits the fills). Otherwise QX is asked to remove the rest, by issuer, asset, the price the ledger recorded and that many shares.
++    // QX removes all of that or nothing, pays price x shares back to QPOOL with an ordinary transfer (the hook files it under globalUnattributed) and
++    // charges nothing. If QX removes nothing (or the call fails) the call returns EXTERNAL_CALL with NOTHING written, not even the fills. Everything
++    // is written after the call, in the order of Execute's BUY: the fills are credited and the bid lowered (ApplyHolding, which syncs the dividends the
++    // shares earned before their number changes), the refund is taken out of globalUnattributed again, and then it is handed to the seat owners.
++    // If QX ever removed fewer shares than asked the rest stays booked as resting (the books follow what QX reports, and the record of the bid stays).
++    //
++    // THE REFUND is what QX really paid in (the smaller of price x shares removed, the rise of the balance and what the hook filed), split over the seat
++    // owners by their cost units with a running total, exactly as SettleIpo splits a refund: the shares add up to the amount exactly, nobody is more
++    // than a unit from his exact pro-rata share and none is above his cost. Each owner's cost shrinks by his share, so the costs keep adding up to
++    // the holding's costBasis, which keeps adding up to what is really spent; what the owner earned on his old cost is crystallised first. The QU goes to his
++    // uncommitted balance (and not the pool's pooled capital: it is his, like the refund of an unspent BUY), is new money for the pool's open votes
++    // (lastDepositTick, as in SettleIpo), and leaves the pool's committedTotal for its uncommittedTotal. An open offer of a seat that shrinks is
++    // withdrawn, because it is written in cost units and would otherwise sell a larger part of what is left than its owner named. A holding that has
++    // shares or has earned something keeps at least one unit of cost. Anything the books cannot hand out (those rows do not add up to the holding's
++    // cost, or the unit that stays) is QPOOL revenue, like every arrival that belongs to nobody: nothing is left in the counter.
++    //
++    // THE HOLDING afterwards: with shares, or still resting, it carries on with the smaller cost. With neither it is retired like any sold-out holding,
++    // and if its whole cost went back and it never earned anything its slot is freed, the way SettleIpo frees a failed IPO (seat rows and offers cleared,
++    // the pool gets its place back), which also drops it from the ledger (and the ledger, with its claim on the asset name, if it was the last holding).
++    // The ledger's record of the bid is cleared when no bid rests any more.
++    //
++    // Every refusal comes before the first write and refunds whatever was attached (there is no fee).
++    struct CancelQxBid_input { uint64 poolId; uint64 holdingId; };
++    // cancelledShares: shares QX removed from the book. refunded: QU credited to the seat owners. pendingLeft: shares of the bid still booked as resting.
++    struct CancelQxBid_output { uint32 returnCode; uint64 cancelledShares; uint64 refunded; uint64 pendingLeft; };
++    struct CancelQxBid_locals
++    {
++        Pool pool; Holding h; ContribKey ck; Contribution c; OwnKey ok; Ownership own; OfferKey fk;
++        SourceKeyOf_input kin; SourceKeyOf_output kout; SourceLedger led;
++        ApplyHolding_input apIn; ApplyHolding_output apOut;
++        ForgetQxBid_input fqIn; ForgetQxBid_output fqOut;
++        TakeBackRefund_input tbIn; TakeBackRefund_output tbOut;
++        QX::RemoveFromBidOrder_input rmIn; QX::RemoveFromBidOrder_output rmOut;
++        Entity ent; uint128 accrued; sint64 held;
++        uint64 allowed; uint64 unclaimed; uint64 newClaim; uint64 pendingNow; uint64 removed;
++        uint64 balBefore; uint64 balAfter; uint64 gaBefore; uint64 arrived; uint64 viaHook; uint64 refund;
++        uint64 give; uint64 returned; uint64 leftover; uint64 base; uint64 i; uint64 prefix; uint64 cum; uint64 prevCum; uint64 refundEach;
++        uint64 dropped; uint64 offersDropped; uint64 freed;
++    };
++    PUBLIC_PROCEDURE_WITH_LOCALS(CancelQxBid)
++    {
++        if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
++        output.cancelledShares = 0;
++        output.refunded = 0;
++        output.pendingLeft = 0;
++        // ---- 1. the holding, its pool and its ledger (reads only) ----
++        if (input.poolId >= QPOOLK6_MAX_POOLS || input.holdingId >= QPOOLK6_MAX_HOLDINGS)
++        {
++            output.returnCode = QPOOLK6_ERR_INVALID_INPUT; return;
++        }
++        locals.pool = state.get().pools.get(input.poolId);
++        locals.h = state.get().holdings.get(input.holdingId);
++        if (locals.pool.active == 0 || locals.h.costBasis == 0 || locals.h.active == 0 || locals.h.poolId != input.poolId)
++        {
++            output.returnCode = QPOOLK6_ERR_NOT_FOUND; return;
++        }
++        if (locals.h.ipoContractIndex != 0)
++        {
++            output.returnCode = QPOOLK6_ERR_WRONG_STATUS; return;      // an IPO holding's pendingShares are seats, not a QX bid
++        }
++        locals.kin.asset = locals.h.asset;
++        locals.kin.ipoContractIndex = locals.h.ipoContractIndex;
++        locals.kin.payerIndex = locals.h.payerIndex;
++        CALL(SourceKeyOf, locals.kin, locals.kout);
++        if (locals.kout.valid == 0 || !state.get().sources.get(locals.kout.key, locals.led))
++        {
++            output.returnCode = QPOOLK6_ERR_NOT_FOUND; return;
++        }
++        // ---- 2. who may cancel ----
++        locals.allowed = (qpi.invocator() == locals.pool.creator) ? 1 : 0;
++        if (locals.allowed == 0)
++        {
++            locals.ok.member = qpi.invocator();
++            locals.ok.holdingId = input.holdingId;
++            if (state.get().ownership.get(locals.ok, locals.own) && locals.own.cost > 0) locals.allowed = 1;
++        }
++        if (locals.allowed == 0 && locals.led.pendingQx > 0 && locals.led.qxBidPrice != 0
++            && (uint64)qpi.tick() > (uint64)locals.led.qxBidTick
++            && (uint64)qpi.tick() - (uint64)locals.led.qxBidTick > QPOOLK6_QX_BID_MAX_AGE_TICKS)
++        {
++            locals.allowed = 1;
++        }
++        if (locals.allowed == 0)
++        {
++            output.returnCode = QPOOLK6_ERR_NOT_AUTHORIZED; return;
++        }
++        // ---- 3. what still rests (a read of what ReconcileHolding would credit) ----
++        if (locals.h.pendingShares == 0 || locals.led.pendingQx == 0)
++        {
++            output.returnCode = QPOOLK6_ERR_NO_PENDING_BID; return;
++        }
++        // In a CONTRACT ledger the fills of a QX bid are only told apart from won IPO shares once every IPO holding has settled (as ReconcileHolding).
++        if (locals.kout.key.kind == QPOOLK6_SOURCE_CONTRACT && locals.led.unsettled != 0)
++        {
++            output.returnCode = QPOOLK6_ERR_SETTLEMENT_PENDING; return;
++        }
++        locals.held = qpi.numberOfShares(locals.h.asset,
++            AssetOwnershipSelect::byOwner(SELF), AssetPossessionSelect::byPossessor(SELF));
++        if (locals.held < 0) locals.held = 0;
++        locals.unclaimed = ((uint64)locals.held > locals.led.recognized)
++            ? (uint64)locals.held - locals.led.recognized : 0;
++        locals.newClaim = (locals.unclaimed < locals.h.pendingShares) ? locals.unclaimed : locals.h.pendingShares;
++        locals.pendingNow = locals.h.pendingShares - locals.newClaim;
++        if (locals.pendingNow == 0)
++        {
++            output.returnCode = QPOOLK6_ERR_NO_PENDING_BID; return;      // every share has filled: ReconcileHolding credits them
++        }
++        // A bid with no recorded price cannot be named to QX (the books are wrong: Execute records it whenever a bid is left resting).
++        if (locals.led.qxBidPrice == 0)
++        {
++            output.returnCode = QPOOLK6_ERR_BOOKS_INCONSISTENT; return;
++        }
++
++        // ---- 4. the call to QX: still no write ----
++        qpi.getEntity(SELF, locals.ent);
++        locals.balBefore = locals.ent.incomingAmount - locals.ent.outgoingAmount;
++        locals.gaBefore = state.get().globalUnattributed;
++        locals.rmIn.issuer = locals.h.asset.issuer;
++        locals.rmIn.assetName = locals.h.asset.assetName;
++        locals.rmIn.price = (sint64)locals.led.qxBidPrice;
++        locals.rmIn.numberOfShares = (sint64)locals.pendingNow;
++        INVOKE_OTHER_CONTRACT_PROCEDURE_E(QX, RemoveFromBidOrder,
++            locals.rmIn, locals.rmOut, (sint64)0, rmErr);
++        locals.removed = 0;
++        if (rmErr == NoCallError && locals.rmOut.removedNumberOfShares > 0)
++        {
++            locals.removed = (uint64)locals.rmOut.removedNumberOfShares;
++            if (locals.removed > locals.pendingNow) locals.removed = locals.pendingNow;
++        }
++        if (locals.removed == 0)
++        {
++            // The call failed before it ran, or QX holds no such order (or a smaller one): nothing moved and nothing was parked.
++            output.pendingLeft = locals.pendingNow;
++            output.returnCode = QPOOLK6_ERR_EXTERNAL_CALL; return;
++        }
++        // What QX paid back: the smaller of price x shares, the rise of the balance and what the hook parked (as BuyRefund), so the books can only err
++        // towards leaving QU unowned. It reached the hook as an ordinary transfer from QX and sits in globalUnattributed: take it out again.
++        qpi.getEntity(SELF, locals.ent);
++        locals.balAfter = locals.ent.incomingAmount - locals.ent.outgoingAmount;
++        locals.arrived = (locals.balAfter > locals.balBefore) ? locals.balAfter - locals.balBefore : 0;
++        locals.viaHook = (state.get().globalUnattributed > locals.gaBefore) ? state.get().globalUnattributed - locals.gaBefore : 0;
++        locals.refund = smul(locals.led.qxBidPrice, locals.removed);
++        if (locals.arrived < locals.refund) locals.refund = locals.arrived;
++        if (locals.viaHook < locals.refund) locals.refund = locals.viaHook;
++        locals.tbIn.amount = locals.refund;
++        CALL(TakeBackRefund, locals.tbIn, locals.tbOut);
++
++        // ---- 5. the books: from here on nothing refuses ----
++        // The fills are credited and the bid lowered through the choke point: it syncs the dividends the holding earned on its old weight first,
++        // moves the ledger's recognised and pending totals, and pays the dividends the hook set aside for the new fills (as ReconcileHolding).
++        locals.apIn.holdingId = input.holdingId;
++        locals.apIn.h = locals.h;
++        locals.apIn.newShares = locals.h.shares + locals.newClaim;
++        locals.apIn.newPending = locals.pendingNow - locals.removed;
++        locals.apIn.markSettled = 0;
++        locals.apIn.claimEscrow = (locals.newClaim > 0) ? 1 : 0;
++        locals.apIn.retire = 0;
++        CALL(ApplyHolding, locals.apIn, locals.apOut);
++        locals.h = locals.apOut.h;
++
++        // The refund goes back to the seat owners. A holding that has shares or has earned something keeps one unit of cost, whatever the books say.
++        locals.base = locals.h.poolId * QPOOLK6_MAX_CONTRIBUTORS_PER_POOL;
++        locals.give = locals.refund;
++        if ((locals.h.shares > 0 || locals.h.totalPayouts > 0) && locals.give >= locals.h.costBasis) locals.give = locals.h.costBasis - 1;
++        locals.returned = 0;
++        locals.dropped = 0;
++        locals.offersDropped = 0;
++        if (locals.give > 0)
++        {
++            locals.prefix = 0;
++            locals.prevCum = 0;
++            for (locals.i = 0; locals.i < locals.pool.contributorCount; locals.i++)
++            {
++                locals.ok.member = state.get().members.get(locals.base + locals.i);
++                locals.ok.holdingId = input.holdingId;
++                if (!state.get().ownership.get(locals.ok, locals.own)) continue;
++                if (locals.own.cost == 0) continue;
++                // Each member is refunded once: only the roster slot his own record names counts (as SettleIpo). A roster member without a record
++                // (impossible since EnsureMember) is given one at his own position.
++                locals.ck.member = locals.ok.member;
++                locals.ck.poolId = locals.h.poolId;
++                locals.c.uncommitted = 0; locals.c.committed = 0; locals.c.lockedForVotes = 0;
++                locals.c.lockStartTick = 0; locals.c.lockExpiryTick = 0; locals.c.lastDepositTick = 0;
++                locals.c.memberIdx = locals.i;
++                if (state.get().contributions.get(locals.ck, locals.c) && locals.c.memberIdx != locals.i) continue;
++                // Split `give` by the RUNNING total of the cost units, rounded down: refund(i) = floor(P(i) x give / costBasis) - floor(P(i-1) x give /
++                // costBasis), P(i) the cost units of the owners up to and including i. The refunds add up to `give` exactly when the seats add up to
++                // costBasis, and each is within one unit of the exact pro-rata amount and never above the owner's cost.
++                locals.prefix = locals.prefix + locals.own.cost;
++                locals.cum = div((uint128)locals.prefix * (uint128)locals.give, (uint128)locals.h.costBasis).low;
++                locals.refundEach = (locals.cum > locals.prevCum) ? locals.cum - locals.prevCum : 0;
++                locals.prevCum = locals.cum;
++                if (locals.refundEach > locals.own.cost) locals.refundEach = locals.own.cost;
++                if (locals.refundEach > locals.give - locals.returned) locals.refundEach = locals.give - locals.returned;
++                if (locals.refundEach == 0) continue;
++
++                // Crystallise what this seat has accrued BEFORE its cost shrinks, or the shrink would re-price an already credited payout.
++                locals.accrued = (uint128)locals.own.cost
++                    * (locals.h.payoutPerCostX64 - locals.own.payoutDebtX64);
++                locals.own.claimable = sadd(locals.own.claimable, locals.accrued.high);
++                locals.own.payoutDebtX64 = locals.h.payoutPerCostX64;
++                locals.own.cost = locals.own.cost - locals.refundEach;
++                // An offer is written in cost units: left in place it would sell a larger part of the smaller seat than its owner named. It is
++                // withdrawn (he can offer again), and the pool gets the place back.
++                locals.fk.seller = locals.ok.member;
++                locals.fk.holdingId = input.holdingId;
++                if (state.get().offers.contains(locals.fk))
++                {
++                    state.mut().offers.removeByKey(locals.fk);
++                    locals.offersDropped = locals.offersDropped + 1;
++                }
++                if (locals.own.cost == 0 && locals.own.claimable == 0)
++                {
++                    // Nothing left of the seat and nothing owed on it: the row goes.
++                    state.mut().ownership.removeByKey(locals.ok);
++                    locals.dropped = locals.dropped + 1;
++                }
++                else
++                {
++                    state.mut().ownership.set(locals.ok, locals.own);
++                }
++
++                locals.c.uncommitted = sadd(locals.c.uncommitted, locals.refundEach);
++                locals.c.lastDepositTick = qpi.tick();        // capital handed back is new money to the pool's open votes (see Vote)
++                locals.c.committed = (locals.c.committed > locals.refundEach)
++                    ? locals.c.committed - locals.refundEach : 0;
++                state.mut().contributions.set(locals.ck, locals.c);
++                locals.returned = sadd(locals.returned, locals.refundEach);
++            }
++            locals.pool.uncommittedTotal = sadd(locals.pool.uncommittedTotal, locals.returned);
++            locals.pool.committedTotal = (locals.pool.committedTotal > locals.returned)
++                ? locals.pool.committedTotal - locals.returned : 0;
++            locals.h.costBasis = (locals.h.costBasis > locals.returned)
++                ? locals.h.costBasis - locals.returned : 0;
++        }
++        // What came back from QX and no seat could be handed (the unit a holding keeps, or rows that do not add up to the cost) belongs to nobody:
++        // QPOOL revenue, paid out at END_EPOCH like every other arrival of that kind.
++        if (locals.refund > locals.returned)
++        {
++            locals.leftover = locals.refund - locals.returned;
++            state.mut().pendingRevenue = sadd(state.get().pendingRevenue, locals.leftover);
++            state.mut().totalRevenue = sadd(state.get().totalRevenue, locals.leftover);
++        }
++
++        // The whole cost went back and the holding never earned anything: the slot is about to be reusable, so clear every seat and offer of this
++        // holding id (a stale record would be inherited by whatever holding takes the slot next), as SettleIpo does for a failed IPO.
++        locals.freed = 0;
++        if (locals.h.costBasis == 0 && locals.h.totalPayouts == 0 && locals.h.shares == 0 && locals.h.pendingShares == 0)
++        {
++            for (locals.i = 0; locals.i < locals.pool.contributorCount; locals.i++)
++            {
++                locals.ok.member = state.get().members.get(locals.base + locals.i);
++                locals.ok.holdingId = input.holdingId;
++                if (state.get().ownership.contains(locals.ok))
++                {
++                    state.mut().ownership.removeByKey(locals.ok);
++                    locals.dropped = locals.dropped + 1;
++                }
++                locals.fk.seller = locals.ok.member;
++                locals.fk.holdingId = input.holdingId;
++                if (state.get().offers.contains(locals.fk))
++                {
++                    state.mut().offers.removeByKey(locals.fk);
++                    locals.offersDropped = locals.offersDropped + 1;
++                }
++            }
++            locals.freed = 1;
++        }
++        // The pool's books: the quotas the rows and offers used are given back, and a freed holding gives its slot back.
++        locals.pool.ownershipRows = (locals.pool.ownershipRows > locals.dropped) ? locals.pool.ownershipRows - locals.dropped : 0;
++        locals.pool.offerCount = (locals.pool.offerCount > locals.offersDropped) ? locals.pool.offerCount - locals.offersDropped : 0;
++        if (locals.freed != 0)
++        {
++            locals.pool.holdingCount = (locals.pool.holdingCount > 0) ? locals.pool.holdingCount - 1 : 0;
++            if (input.holdingId < state.get().holdingFreeHint) state.mut().holdingFreeHint = input.holdingId;
++        }
++        state.mut().pools.set(locals.h.poolId, locals.pool);
++        locals.h.rows = (locals.h.rows > locals.dropped) ? (uint32)(locals.h.rows - locals.dropped) : 0;
++        // A slot that is free again is no holding: it carries no incarnation, so no mandate can be about it.
++        if (locals.freed != 0) locals.h.incarnation = 0;
++
++        if (locals.h.shares == 0 && locals.h.pendingShares == 0)
++        {
++            // Nothing left to hold or to wait for: the holding leaves its ledger like any sold-out holding (a freed one has costBasis 0 and active 0,
++            // which is what a free slot is; the ledger and its claim on the asset name go with its last holding).
++            locals.apIn.holdingId = input.holdingId;
++            locals.apIn.h = locals.h;
++            locals.apIn.newShares = 0;
++            locals.apIn.newPending = 0;
++            locals.apIn.markSettled = 0;
++            locals.apIn.claimEscrow = 0;
++            locals.apIn.retire = 1;
++            CALL(ApplyHolding, locals.apIn, locals.apOut);
++            locals.h = locals.apOut.h;
++        }
++        else
++        {
++            state.mut().holdings.set(input.holdingId, locals.h);
++        }
++        // No bid rests on the ledger any more (the retire above may have deleted it): its record goes.
++        locals.fqIn.asset = locals.h.asset;
++        locals.fqIn.payerIndex = locals.h.payerIndex;
++        CALL(ForgetQxBid, locals.fqIn, locals.fqOut);
++
++        output.cancelledShares = locals.removed;
++        output.refunded = locals.returned;
++        output.pendingLeft = locals.h.pendingShares;
+         output.returnCode = QPOOLK6_OK;
+     }
+ 
+@@ -4785,7 +5391,9 @@
+         output.returnCode = (locals.overspent != 0) ? QPOOLK6_ERR_BOOKS_INCONSISTENT : QPOOLK6_OK;
+     }
+ 
+-    // Close out an IPO position once the auction has resolved. Permissionless.
++    // Close out an IPO position once the auction has resolved. This is the ONE implementation of the settlement: BEGIN_EPOCH calls it for the
++    // holdings that are ready (see "SETTLEMENT AT BEGIN_EPOCH"), and the permissionless user procedure SettleIpo (below) calls it for anybody who asks.
++    // A holding that BEGIN_EPOCH has settled answers a later SettleIpo with IPO_NOT_ACTIVE, like any settled holding. A refusal writes nothing.
+     //
+     // WHEN. Only when the target's snapshot exists (END_EPOCH took it at the end of the IPO epoch) and the epoch has moved on: positive
+     // evidence that the auction is over, never "the book cannot be read" (the core also answers -2 in every epoch that is not the IPO
+@@ -4803,19 +5411,25 @@
+     // for this holding alone: the order in which holdings settle, a stale count of seats, the refund pot and the number of shares
+     // QPOOL holds in total play no part in what a holding gets (audit C004, C005, C038).
+     //
+-    // THE NAME. The vote declared the share asset's name, which nothing could check then. A holding that won seats gets them only if
+-    // the universe proves the name: the ledger of the target is not bound to another name, the pairing is possible (ContractPairKnown:
+-    // the embedded table, and no other ledger owns the name) and QPOOL holds at least recognised + seats shares of it. Otherwise
+-    // NAME_UNPROVEN: nothing is written and the holding stays as it is, with its capital on the books (audit C037). Such a holding
+-    // keeps the ledger of its target unsettled, which parks that ledger's dividends; see README.
++    // THE NAME. A BUY_IPO names no asset: the name of the shares the core issued for the target comes from the chain (NameOfIndex: the embedded
++    // table for an index up to QPOOLK6_KNOWN_CONTRACTS, otherwise the registry that BEGIN_EPOCH fills when the IPO ends, see "THE NAME OF AN
++    // IPO'S SHARES"). A holding that WON SEATS needs it: while the registry has no name for the target's index the call returns NAME_PENDING
++    // and writes nothing, the holding waits (BEGIN_EPOCH hands it over again at every epoch start, and anybody can call SettleIpo). A holding
++    // that won no seat needs no name and settles at once. With the name known, the holding takes it (the ledger of the target is bound to it by
++    // the first settlement that wins shares) and the seats are proven as before: QPOOL must hold at least recognised + seats shares of the
++    // asset. Otherwise NAME_UNPROVEN, which now means a shortfall of shares only: nothing is written and the holding stays as it is, with its
++    // capital on the books (audit C037). Such a holding keeps the ledger of its target unsettled, which parks that ledger's dividends; see README.
+     //
+     // THE REFUND is split over the seat owners by their cost units with a running total, so the shares add up to the amount exactly and
+     // nobody is more than a unit from his exact pro-rata share (audit C068).
+     //
+     // A holding that has shares is never retired, and the refund never takes the last unit of its cost.
+-    PUBLIC_PROCEDURE_WITH_LOCALS(SettleIpo)
++    PRIVATE_PROCEDURE_WITH_LOCALS(SettleHolding)
+     {
+-        if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
++        // CALL() zeroes the callee's locals but not the caller's output struct, and BEGIN_EPOCH calls this in a loop: start from a clean output.
++        output.returnCode = QPOOLK6_OK;
++        output.shares = 0;
++        output.returnedToMembers = 0;
+         if (input.holdingId >= QPOOLK6_MAX_HOLDINGS) { output.returnCode = QPOOLK6_ERR_INVALID_INPUT; return; }
+         locals.h = state.get().holdings.get(input.holdingId);
+         // ipoSettled makes this single-shot: a second call used to recompute
+@@ -4889,27 +5503,24 @@
+         locals.myShare = 0;
+         if (locals.seat.shares > 0)
+         {
++            // The name the chain gave the target's shares: none yet = wait (nothing has been written).
++            locals.nameIn.index = locals.kout.contractIndex;
++            CALL(NameOfIndex, locals.nameIn, locals.nameOut);
++            if (locals.nameOut.name == 0)
++            {
++                output.returnCode = QPOOLK6_ERR_NAME_PENDING; return;
++            }
++            // The holding takes the name (kept only if the call goes through: nothing has been written yet, and a refusal below returns).
++            locals.h.asset.assetName = locals.nameOut.name;
+             locals.held = qpi.numberOfShares(locals.h.asset,
+                 AssetOwnershipSelect::byOwner(SELF), AssetPossessionSelect::byPossessor(SELF));
+             if (locals.held < 0) locals.held = 0;
+-            // The shares of the declared name that the ledger has not counted yet must cover the seats: this is a ceiling on
++            // The shares of the name that the ledger has not counted yet must cover the seats: this is a ceiling on
+             // what the universe proves, not what the holding gets (that is the snapshot's number, whatever the others did).
+             locals.proven = ((uint64)locals.held >= sadd(locals.led.recognized, locals.seat.shares)) ? 1 : 0;
+-            if (locals.led.assetName != 0)
+-            {
+-                // the target's ledger is bound to a name already: a holding that declared another one cannot be proven
+-                if (locals.led.assetName != locals.h.asset.assetName) locals.proven = 0;
+-            }
+-            else if (locals.proven != 0)
+-            {
+-                // This settlement would BIND the target to the declared name. Shares of an asset are counted from the whole
+-                // universe, so the name must not belong to another contract: refuse a name the table lists for another index or
+-                // that another ledger has already claimed.
+-                locals.pairIn.index = locals.kout.contractIndex;
+-                locals.pairIn.assetName = locals.h.asset.assetName;
+-                CALL(ContractPairKnown, locals.pairIn, locals.pairOut);
+-                if (locals.pairOut.returnCode != QPOOLK6_OK) locals.proven = 0;
+-            }
++            // The target's ledger is bound to a name already (by a bought or deposited holding, whose pair the registry proved): it is the
++            // same name by construction (one index, one name); the check is kept as a guard that no ledger can ever mix two assets.
++            if (locals.led.assetName != 0 && locals.led.assetName != locals.h.asset.assetName) locals.proven = 0;
+             if (locals.proven == 0)
+             {
+                 output.returnCode = QPOOLK6_ERR_NAME_UNPROVEN; return;
+@@ -5088,6 +5699,20 @@
+         output.returnCode = QPOOLK6_OK;
+     }
+ 
++    // Settle an IPO holding by hand: permissionless, a backup for the automatic settlement of BEGIN_EPOCH (which settles every holding that is ready, up
++    // to QPOOLK6_AUTO_SETTLE_MAX per epoch, and refuses without writing the ones it cannot settle). Same behaviour and return codes as ever: everything is
++    // in SettleHolding. The only thing done here is what a user procedure owes its caller: an invocation reward attached to the call is sent straight
++    // back (the settlement is free), and it is the ONLY QU that leaves the contract in a settlement. BEGIN_EPOCH has no invocation reward and moves none.
++    PUBLIC_PROCEDURE_WITH_LOCALS(SettleIpo)
++    {
++        if (qpi.invocationReward() > 0) qpi.transfer(qpi.invocator(), qpi.invocationReward());
++        locals.sIn.holdingId = input.holdingId;
++        CALL(SettleHolding, locals.sIn, locals.sOut);
++        output.returnCode = locals.sOut.returnCode;
++        output.shares = locals.sOut.shares;
++        output.returnedToMembers = locals.sOut.returnedToMembers;
++    }
++
+     // ======================== Syndication ========================
+ 
+     // Deposit an asset you already own into your pool and receive 100% of the
+@@ -5320,7 +5945,9 @@
+     //                      time he did;
+     //       CONTRACT ledger the contract the ledger is for is in its IPO epoch NOW: its shares cannot exist before the IPO ends, so a
+     //                      ledger that holds shares of it, bound by a deposit made before the IPO started, is wrong beyond doubt (a contract
+-    //                      that has not started its IPO is "registered, not in its IPO epoch" to the check made at deposit).
++    //                      that has not started its IPO is "registered, not in its IPO epoch" to the check made at deposit). Above the
++    //                      embedded table such a ledger cannot be made any more, because a deposit needs the registry's pair for the name and
++    //                      the registry names a contract only after its IPO has ended: this branch can only meet an index of the table.
+     // An honest early depositor therefore loses his place only to somebody who really needs it and only after it stood unused, and he
+     // loses nothing else: his shares go back to him in full (owned by him, still managed by this contract: take them with
+     // ReleaseManagedShares) before any book is touched, the holding is freed and the ledger is gone. If the return fails nothing is written.
+@@ -5457,8 +6084,7 @@
+         if (state.get().offers.get(locals.fk, locals.f))
+         {
+             locals.isNew = 0;
+-            if (locals.f.costUnits == input.costUnits && locals.f.askPrice == input.askPrice
+-                && locals.f.sharesSnapshot == locals.h.shares)
++            if (locals.f.costUnits == input.costUnits && locals.f.askPrice == input.askPrice)
+             {
+                 output.returnCode = QPOOLK6_OK; return;            // the offer is already exactly this: nothing to write
+             }
+@@ -5471,10 +6097,6 @@
+         locals.f.costUnits = input.costUnits;
+         locals.f.askPrice = input.askPrice;
+         locals.f.poolId = locals.h.poolId;
+-        // F-02 fix: snapshot the real backing now, so a later sale that shrinks it (without the
+-        // seller re-affirming this offer) makes BuyPosition's expectedShares check fail instead of
+-        // silently filling against stale terms.
+-        locals.f.sharesSnapshot = locals.h.shares;
+         if (state.mut().offers.set(locals.fk, locals.f) == NULL_INDEX)
+         {
+             output.returnCode = QPOOLK6_ERR_CAPACITY; return;
+@@ -5513,7 +6135,8 @@
+     //
+     // EVERY REFUSAL COMES BEFORE THE FIRST WRITE, and refunds everything (D23: a refused call must not make the node re-hash the whole state for
+     // nothing). The order of the checks is the order of their cost: the input, the offer, the parcel, the price, the holding (it must still be a
+-    // live one: audit C100, C055), the escrow of its ledger, admission and room on the roster, the fee, the seat row the buyer would need, the seller's
++    // live one: audit C100, C055), its shares (they must still be the expectedShares the buyer read: F-02 fix), the escrow of its ledger,
++    // admission and room on the roster, the fee, the seat row the buyer would need, the seller's
+     // seat (still there, not vote-locked); only then does the sync of the holding, and with it the first write, begin.
+     PUBLIC_PROCEDURE_WITH_LOCALS(BuyPosition)
+     {
+@@ -5559,12 +6182,13 @@
+             qpi.transfer(qpi.invocator(), qpi.invocationReward());
+             output.returnCode = QPOOLK6_ERR_SETTLEMENT_PENDING; return;
+         }
+-        // F-02 fix: the buyer also states the real backing they read (GetPosition.offeredShares,
+-        // i.e. Offer.sharesSnapshot), the same way expectedCostUnits states the parcel. costUnits
++        // F-02 fix: the buyer also states the shares they read (GetPosition.offeredShares, which is the
++        // holding's live Holding.shares), the same way expectedCostUnits states the parcel. costUnits
+         // is a claim on the holding's (permanent) ownership denominator, which a sale does not
+         // shrink -- but the shares actually backing that claim can, and a sale between the buyer's
+         // read and this call (gutting the holding via SELL_QX / SELL_QSWAP) would otherwise fill
+-        // the buyer's purchase at the pre-sale price against post-sale backing. Any change here,
++        // the buyer's purchase at the pre-sale price against post-sale backing. The comparison is with
++        // the holding's shares NOW, not with a copy stored when the offer was written. Any change here,
+         // not just a decrease, is refused: the buyer must re-read and re-confirm, exactly like a
+         // changed costUnits or askPrice.
+         if (locals.h.shares != input.expectedShares)
+@@ -5762,12 +6386,17 @@
+     // ceiling it places ONE bid at exactly that level's price for as many tokens as the remaining budget covers. The attached amount
+     // equals the cost, so nothing comes back and the pot is spent to within one token's price. At most QPOOLK6_QPAY_MAX_LEVELS levels are
+     // bought per call; the rest of the pot waits. If nothing is on offer at or below the ceiling the pot simply waits, for any number of
+-    // epochs. QX's fee for handing the shares over (QPOOLK6_QX_TRANSFER_FEE) is paid out of the pot too.
++    // epochs. The call attaches QPOOLK6_QX_TRANSFER_FEE out of the pot to QX's hand-over of the shares (see HOW IT BURNS), and the pot
++    // is charged only what really left the balance for it.
+     //
+     // HOW IT BURNS. Shares bought on QX sit under QX's management. The call takes the management rights over (TransferShareManagementRights
+     // to this contract) and then transfers the shares to the all-zero key, which the core treats as a real burn of a user-issued token
+     // (assets.h: shares are subtracted from the source records and no destination record is created; contract shares cannot be burned).
+     // Shares bought but not burned (a failed hand-over) are counted in qpayUnburned and burned by the next call.
++    // THE HAND-OVER FEE. QX's TransferShareManagementRights asks no fee (Qx.h: "no fee") and hands back the whole amount attached to it,
++    // and QPOOL's own PRE_ACQUIRE_SHARES asks for 0, so the 100 QU normally come straight back (the hook parks them, UnparkArrivals
++    // gives them back). They are not booked as spent: the pot is charged the balance difference measured around the hand-over call,
++    // which is 0 when QX refunds in full and the real amount if a QX ever keeps it.
+     struct BuyAndBurnQpay_input { uint64 maxLevels; };
+     struct BuyAndBurnQpay_output { uint32 returnCode; uint64 bought; uint64 spent; uint64 burned; uint64 potLeft; uint64 unburned; };
+     struct BuyAndBurnQpay_locals
+@@ -5781,7 +6410,7 @@
+         uint64 balBefore; uint64 gaBefore; uint64 pot; uint64 avail; uint64 budget; uint64 maxLevels; uint64 fee;
+         uint64 heldBefore; uint64 heldAfter; uint64 filled; uint64 spentTotal; uint64 boughtTotal; uint64 stranded; uint64 spentAll;
+         uint64 i; uint64 levels; uint64 px; uint64 sh; uint64 runPrice; uint64 runQty; uint64 n; uint64 called; uint64 stop; uint64 any;
+-        uint64 readFailed; uint64 burnNow; uint64 burned; uint64 feePaid; uint64 left; sint64 rem;
++        uint64 readFailed; uint64 burnNow; uint64 burned; uint64 feePaid; uint64 left; sint64 rem; uint64 balHand; uint64 balAfter;
+     };
+     PUBLIC_PROCEDURE_WITH_LOCALS(BuyAndBurnQpay)
+     {
+@@ -5812,7 +6441,7 @@
+         qpi.getEntity(SELF, locals.ent);
+         locals.balBefore = locals.ent.incomingAmount - locals.ent.outgoingAmount;
+         locals.avail = (locals.pot < locals.balBefore) ? locals.pot : locals.balBefore;
+-        // the budget for buying keeps back QX's hand-over fee, which also comes out of the pot
++        // the budget for buying keeps back the amount attached to QX's hand-over, which also comes out of the pot (QX normally refunds it)
+         locals.budget = (locals.avail > locals.fee) ? locals.avail - locals.fee : 0;
+         locals.gaBefore = state.get().globalUnattributed;
+         locals.spentTotal = 0; locals.boughtTotal = 0; locals.stranded = 0; locals.levels = 0;
+@@ -5935,12 +6564,19 @@
+                 locals.mIn.asset = locals.asset;
+                 locals.mIn.numberOfShares = (sint64)locals.burnNow;
+                 locals.mIn.newManagingContractIndex = (uint32)SELF_INDEX;
++                // What the pot pays for the hand-over is what LEFT the balance across this call, measured (see THE HAND-OVER FEE): QX
++                // refunds the attached amount in full, so booking the nominal fee as spent would leave that QU in the balance counted by
++                // no bucket.
++                qpi.getEntity(SELF, locals.ent);
++                locals.balHand = locals.ent.incomingAmount - locals.ent.outgoingAmount;
+                 INVOKE_OTHER_CONTRACT_PROCEDURE_E(QX, TransferShareManagementRights,
+                     locals.mIn, locals.mOut, QPOOLK6_QX_TRANSFER_FEE, mgErr);
+                 locals.called = 1;
++                qpi.getEntity(SELF, locals.ent);
++                locals.balAfter = locals.ent.incomingAmount - locals.ent.outgoingAmount;
++                locals.feePaid = (locals.balHand > locals.balAfter) ? locals.balHand - locals.balAfter : 0;
+                 if (mgErr == NoCallError && locals.mOut.transferredNumberOfShares > 0)
+                 {
+-                    locals.feePaid = locals.fee;
+                     locals.rem = qpi.transferShareOwnershipAndPossession(locals.asset.assetName, locals.asset.issuer, SELF, SELF,
+                         locals.mOut.transferredNumberOfShares, NULL_ID);
+                     if (locals.rem >= 0) locals.burned = (uint64)locals.mOut.transferredNumberOfShares;
+@@ -5986,6 +6622,7 @@
+         REGISTER_USER_FUNCTION(GetSource, 7);
+         REGISTER_USER_FUNCTION(GetIpoTarget, 8);
+         REGISTER_USER_FUNCTION(GetIpoBids, 9);
++        REGISTER_USER_FUNCTION(GetNameRegistry, 10);
+ 
+         REGISTER_USER_PROCEDURE(CreatePool, 1);
+         REGISTER_USER_PROCEDURE(Contribute, 2);
+@@ -6009,12 +6646,264 @@
+         REGISTER_USER_PROCEDURE(CloseEmptyPool, 20);
+         REGISTER_USER_PROCEDURE(EvictSquat, 21);
+         REGISTER_USER_PROCEDURE(BuyAndBurnQpay, 22);
++        REGISTER_USER_PROCEDURE(CancelQxBid, 23);
+     }
+ 
+     INITIALIZE()
+     {
+         // Nothing to seed: there is no admin, and every pool is created by a
+         // user. Deliberately so — no key in this contract can move member funds.
++    }
++
++    // The pairing of share names (see "THE NAME OF AN IPO'S SHARES"): the first step of BEGIN_EPOCH, a private procedure so that the settlement step that
++    // follows it runs whatever this one returns. Runs at the start of every epoch, after the core has finished the IPOs
++    // of the epoch that ended (finishIPOs(), which issued the shares) and rebuilt the asset table, and before the first tick. It is also run
++    // after a node restart at the first tick of an epoch, so it is IDEMPOTENT: a second call finds no new name, an empty queue and nothing wrong, and
++    // writes nothing. The queue is only ever appended to in END_EPOCH, so a restart cannot append twice.
++    //   1. The walk: every issuance of the zero issuer (NULL_ID), in the iterator's order (which is NOT the order of issuance: assetsEndEpoch() has
++    //      rebuilt the table), at most QPOOLK6_NAME_WALK_MAX of them. A name in the embedded table is skipped; a name the registry already
++    //      knows is skipped; any other is NEW and is recorded at once as 'known, never paired' (contractNames value 0).
++    //   2. The first call ever (nameBaselineDone == 0) only does that, sets the flag and ends: the names of every contract that IPO'd before this one
++    //      was deployed are the baseline, and are never paired (a purchase or deposit of their shares is refused: NAME_PENDING).
++    //   3. Later calls pair the n new names with the q queued indices, but only if n == q != 0, the queue did not overflow, the walk ended, and the
++    //      queued indices are valid and still without a name. One name and one index: the pair is certain. Several: each name is matched to the
++    //      queued index whose book has the same fingerprint (the same bidders: see END_EPOCH), and only if every name matches exactly one index and every
++    //      index exactly one name. Anything else QUARANTINES the epoch: nothing is paired, the names stay 'known, never paired', the mismatch is counted
++    //      with its evidence (GetNameRegistry), and a holding on such an index that won seats waits for ever (SettleIpo: NAME_PENDING; nothing is lost).
++    //   4. The queue is emptied and its overflow flag cleared, whatever happened.
++    // The walk reads the universe without a lock like every contract that iterates it: nothing writes the universe while the contract processor
++    // runs a system procedure. Its cost is bounded by the steps counted below (the core's own scan inside one next() is bounded by the number of
++    // records between two issuances of the zero issuer), a holder walk by QPOOLK6_NAME_HOLDERS_MAX per new name and QPOOLK6_NAME_QUEUE_CAP names.
++    struct PairNames_input {};
++    struct PairNames_output {};
++    struct PairNames_locals
++    {
++        AssetIssuanceIterator it; AssetPossessionIterator pit;
++        KnownContractIndex_input kIn; KnownContractIndex_output kOut;
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> newNames;   // the new names, in the order of the walk
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> newFp;      // the fingerprint of the holders of each
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> pick;       // the queue position each is paired with
++        Array<uint64, QPOOLK6_NAME_QUEUE_CAP> taken;      // how many names picked each queue position
++        Asset asset;
++        uint64 baseline; uint64 steps; uint64 walkEnded; uint64 name; uint64 n; uint64 q; uint64 ok;
++        uint64 i; uint64 j; uint64 cnt; uint64 hit; uint64 idx; uint64 holders; uint64 fp;
++    };
++    PRIVATE_PROCEDURE_WITH_LOCALS(PairNames)
++    {
++        locals.baseline = state.get().nameBaselineDone;
++        locals.n = 0;
++        locals.steps = 0;
++        locals.walkEnded = 1;
++        for (locals.it.begin(AssetIssuanceSelect::byIssuer(NULL_ID)); !locals.it.reachedEnd(); locals.it.next())
++        {
++            locals.steps = locals.steps + 1;
++            if (locals.steps > QPOOLK6_NAME_WALK_MAX)
++            {
++                locals.walkEnded = 0;
++                break;
++            }
++            locals.name = locals.it.assetName();
++            locals.kIn.name = locals.name;
++            CALL(KnownContractIndex, locals.kIn, locals.kOut);
++            if (locals.kOut.index != 0) continue;                                // a name of the embedded table
++            if (state.get().contractNames.contains(locals.name)) continue;       // a name the registry knows
++            state.mut().contractNames.set(locals.name, 0);                       // new: known, never paired, unless the pairing below says otherwise
++            if (locals.baseline == 0) continue;
++            if (locals.n < QPOOLK6_NAME_QUEUE_CAP) locals.newNames.set(locals.n, locals.name);
++            locals.n = locals.n + 1;
++        }
++
++        if (locals.baseline == 0)
++        {
++            // The first call: the baseline. Nothing can be queued yet (END_EPOCH has not run), and a queue found anyway is not trusted.
++            state.mut().nameBaselineDone = 1;
++            state.mut().nameQueueLen = 0;
++            state.mut().nameQueueOverflow = 0;
++            return;
++        }
++
++        locals.q = state.get().nameQueueLen;
++        // Nothing new, nothing queued, nothing wrong: nothing to do (a second call in the same epoch, a restart).
++        if (locals.n == 0 && locals.q == 0 && state.get().nameQueueOverflow == 0 && locals.walkEnded != 0) return;
++
++        locals.ok = 0;
++        if (locals.walkEnded != 0 && state.get().nameQueueOverflow == 0
++            && locals.n == locals.q && locals.n != 0 && locals.n <= QPOOLK6_NAME_QUEUE_CAP)
++        {
++            locals.ok = 1;
++            for (locals.j = 0; locals.j < locals.q; locals.j++)
++            {
++                locals.idx = state.get().nameQueue.get(locals.j);
++                if (locals.idx <= QPOOLK6_KNOWN_CONTRACTS || locals.idx > QPOOLK6_MAX_CONTRACT_INDEX
++                    || state.get().indexNames.get(locals.idx) != 0)
++                {
++                    locals.ok = 0;                // not an index that can be paired
++                }
++                locals.taken.set(locals.j, 0);
++            }
++            if (locals.n == 1)
++            {
++                locals.pick.set(0, 0);            // one name, one index: certain
++            }
++            else if (locals.ok != 0)
++            {
++                // Several: by content. The fingerprint of a name is the sum over its possession records of shares x K12(holder), the same
++                // number END_EPOCH made of the final book of the right index (one K12(bidder) per slot).
++                for (locals.i = 0; locals.i < locals.n && locals.ok != 0; locals.i++)
++                {
++                    locals.fp = 0;
++                    locals.holders = 0;
++                    locals.asset.issuer = NULL_ID;
++                    locals.asset.assetName = locals.newNames.get(locals.i);
++                    for (locals.pit.begin(locals.asset, AssetOwnershipSelect::any(), AssetPossessionSelect::any());
++                         !locals.pit.reachedEnd(); locals.pit.next())
++                    {
++                        locals.holders = locals.holders + 1;
++                        if (locals.holders > QPOOLK6_NAME_HOLDERS_MAX)
++                        {
++                            locals.ok = 0;
++                            break;
++                        }
++                        locals.fp = locals.fp + (uint64)locals.pit.numberOfPossessedShares() * qpi.K12(locals.pit.possessor()).u64._0;
++                    }
++                    locals.newFp.set(locals.i, locals.fp);
++                }
++                // every name must match exactly one queued book, and every queued book exactly one name
++                for (locals.i = 0; locals.i < locals.n && locals.ok != 0; locals.i++)
++                {
++                    locals.cnt = 0;
++                    locals.hit = 0;
++                    for (locals.j = 0; locals.j < locals.q; locals.j++)
++                    {
++                        if (state.get().nameQueueFp.get(locals.j) == locals.newFp.get(locals.i))
++                        {
++                            locals.cnt = locals.cnt + 1;
++                            locals.hit = locals.j;
++                        }
++                    }
++                    if (locals.cnt != 1) locals.ok = 0;
++                    locals.pick.set(locals.i, locals.hit);
++                    locals.taken.set(locals.hit, locals.taken.get(locals.hit) + 1);
++                }
++                for (locals.j = 0; locals.j < locals.q && locals.ok != 0; locals.j++)
++                {
++                    if (locals.taken.get(locals.j) != 1) locals.ok = 0;
++                }
++            }
++        }
++
++        if (locals.ok != 0)
++        {
++            for (locals.i = 0; locals.i < locals.n; locals.i++)
++            {
++                locals.idx = state.get().nameQueue.get(locals.pick.get(locals.i));
++                locals.name = locals.newNames.get(locals.i);
++                state.mut().contractNames.set(locals.name, locals.idx);
++                state.mut().indexNames.set(locals.idx, locals.name);
++            }
++            state.mut().namePaired = sadd(state.get().namePaired, locals.n);
++            state.mut().namePairEpoch = (uint64)qpi.epoch();
++        }
++        else
++        {
++            state.mut().nameMismatches = sadd(state.get().nameMismatches, 1ULL);
++            state.mut().nameLastMismatchEpoch = (uint64)qpi.epoch();
++            state.mut().nameLastMismatchNew = locals.n;
++            state.mut().nameLastMismatchQueued = locals.q;
++        }
++        state.mut().nameQueueLen = 0;
++        state.mut().nameQueueOverflow = 0;
++    }
++
++    // BEGIN_EPOCH has two steps, in this order (see "SETTLEMENT AT BEGIN_EPOCH" at the top):
++    //   1. PairNames: the names of the shares that the core issued for the IPOs that ended, paired with their contract indices.
++    //   2. The settlement: the IPO holdings that are READY are handed to SettleHolding, the routine the manual SettleIpo uses. A holding is ready when
++    //      its target's row in ipoTargets has a snapshot and the epoch has moved on (what SettleHolding itself checks first). The holdings of the
++    //      ready targets are found in ipoBids, the table of unsettled IPO holdings (its population is the number of unsettled IPO holdings, at most
++    //      QPOOLK6_MAX_IPO_HOLDINGS; a pass reads its occupation flags, 64 words, and one field of each holding it meets): no loop over pools, holdings or
++    //      proposals. A holding the routine refuses (its name is still pending, QPOOL holds too few shares of it, a book that does not add up) is
++    //      skipped: the routine writes nothing for it and the loop goes on. At most QPOOLK6_AUTO_SETTLE_MAX holdings are handed over per pass, settled
++    //      or refused; a pass that stops there leaves the cursor after the last holding it handed over, so the next epoch continues behind it and
++    //      refused holdings cannot keep the ones after them waiting for ever. What is not reached stays unsettled and can be settled by SettleIpo.
++    //   One pass per epoch: autoSettleEpoch is the epoch of the last pass, and a second BEGIN_EPOCH of the same epoch (a node restart at the first
++    //   tick) returns before it reads anything, so it finds nothing to do. A holding is never settled twice: settling removes it from ipoBids and
++    //   marks it settled, and the routine refuses a settled holding before it writes anything.
++    //   BEGIN_EPOCH has no invocation reward and moves no QU: the routine is bookkeeping inside the contract (the refunds that finishIPOs() paid
++    //   have arrived in ipoRefundEscrow before this runs, the members' balances are credited from it).
++    //   The iteration does not clean up or add to ipoBids: removing the current key leaves the other slots where they are.
++    struct BEGIN_EPOCH_locals
++    {
++        PairNames_input pIn; PairNames_output pOut;
++        SettleHolding_input sIn; SettleHolding_output sOut;
++        Array<uint64, QPOOLK6_MAX_IPO_TARGETS> ready;     // per row of ipoTargets: the target's contract index when the row is ready, else 0
++        IpoTarget row;
++        sint64 idx;
++        uint64 epoch; uint64 start; uint64 wrapped; uint64 step; uint64 t; uint64 hid; uint64 target; uint64 isReady;
++        uint64 nReady; uint64 done; uint64 skipped; uint64 cursor;
++    };
++    BEGIN_EPOCH_WITH_LOCALS()
++    {
++        // ---- 1. The names ----
++        CALL(PairNames, locals.pIn, locals.pOut);
++
++        // ---- 2. The settlement of the ready IPO holdings ----
++        locals.epoch = (uint64)qpi.epoch();
++        if (state.get().autoSettleEpoch == locals.epoch) return;          // this epoch's pass has run (a restart): nothing to do
++        locals.nReady = 0;
++        for (locals.t = 0; locals.t < QPOOLK6_MAX_IPO_TARGETS; locals.t++)
++        {
++            locals.row = state.get().ipoTargets.get(locals.t);
++            if (locals.row.ipoContractIndex != 0 && locals.row.snapshotEpoch != 0 && locals.epoch > locals.row.snapshotEpoch)
++            {
++                locals.ready.set(locals.t, locals.row.ipoContractIndex);
++                locals.nReady = locals.nReady + 1;
++            }
++        }
++        locals.cursor = state.get().autoSettleCursor;
++        if (locals.nReady != 0)
++        {
++            locals.start = (locals.cursor < QPOOLK6_MAX_IPO_HOLDINGS) ? locals.cursor : 0;
++            // From the cursor to the end of the table, then from its beginning back to the cursor: every holding once at most. (start - 1 is
++            // NULL_INDEX when start is 0, which asks for the first element.) A step is a holding or the one turn round, so the bound below is never reached.
++            locals.idx = state.get().ipoBids.nextElementIndex((sint64)locals.start - 1);
++            for (locals.step = 0; locals.step <= QPOOLK6_MAX_IPO_HOLDINGS; locals.step++)
++            {
++                if (locals.idx == NULL_INDEX)
++                {
++                    if (locals.wrapped != 0 || locals.start == 0) break;
++                    locals.wrapped = 1;
++                    locals.idx = state.get().ipoBids.nextElementIndex(NULL_INDEX);
++                    if (locals.idx == NULL_INDEX) break;
++                }
++                if (locals.wrapped != 0 && (uint64)locals.idx >= locals.start) break;
++                locals.hid = state.get().ipoBids.key(locals.idx);
++                locals.target = (locals.hid < QPOOLK6_MAX_HOLDINGS) ? state.get().holdings.get(locals.hid).ipoContractIndex : 0;
++                locals.isReady = 0;
++                for (locals.t = 0; locals.t < QPOOLK6_MAX_IPO_TARGETS; locals.t++)
++                {
++                    if (locals.target != 0 && locals.ready.get(locals.t) == locals.target) locals.isReady = 1;
++                }
++                if (locals.isReady != 0)
++                {
++                    locals.sIn.holdingId = locals.hid;
++                    CALL(SettleHolding, locals.sIn, locals.sOut);
++                    if (locals.sOut.returnCode == QPOOLK6_OK) locals.done = locals.done + 1;
++                    else locals.skipped = locals.skipped + 1;
++                    if (locals.done + locals.skipped >= QPOOLK6_AUTO_SETTLE_MAX)
++                    {
++                        // the bound of this pass: the next one continues behind this holding
++                        locals.cursor = ((uint64)locals.idx + 1 < QPOOLK6_MAX_IPO_HOLDINGS) ? (uint64)locals.idx + 1 : 0;
++                        break;
++                    }
++                }
++                locals.idx = state.get().ipoBids.nextElementIndex(locals.idx);
++            }
++        }
++        state.mut().autoSettleEpoch = locals.epoch;
++        state.mut().autoSettleDone = locals.done;
++        state.mut().autoSettleSkipped = locals.skipped;
++        state.mut().autoSettleTotal = sadd(state.get().autoSettleTotal, locals.done);
++        state.mut().autoSettleCursor = locals.cursor;
+     }
+ 
+     // Route incoming QU. The hook sees only {sourceId, amount, type}: it cannot see
+@@ -6184,6 +7073,8 @@
+         // the IPO snapshot
+         IpoTarget row; uint64 t; uint64 i; sint64 price; uint64 px; uint64 finalPrice;
+         uint64 runPrice; uint64 runCount; uint64 runKnown; IpoPriceKey key; IpoSeat seat;
++        // the success queue (names of the shares of IPOs that end now)
++        uint64 qi; uint64 qj; uint64 qs; uint64 qlen; uint64 qfp; sint64 qprice;
+     };
+     END_EPOCH_WITH_LOCALS()
+     {
+@@ -6192,7 +7083,6 @@
+         state.mut().votes.cleanupIfNeeded();
+         state.mut().offers.cleanupIfNeeded();
+         state.mut().sources.cleanupIfNeeded();
+-        state.mut().contractNames.cleanupIfNeeded();
+         state.mut().admitted.cleanupIfNeeded();
+         state.mut().ipoPrices.cleanupIfNeeded();
+         state.mut().ipoBids.cleanupIfNeeded();
+@@ -6256,6 +7146,55 @@
+             state.mut().ipoTargets.set(locals.t, locals.row);
+         }
+ 
++        // ---- The success queue: which IPOs are about to issue shares (see "THE NAME OF AN IPO'S SHARES"). ----
++        // For every contract index above the embedded table whose IPO ends in this epoch and whose book is FULL, in ascending order: qpi.ipoBidPrice of
++        // the last slot is above 0 exactly when finishIPOs() (which runs right after this hook) calls issueAsset for the contract. ipoBidPrice
++        // answers -1 for an index with no contract (so no index above it has one either: the scan stops), -2 for a contract that is not in its IPO
++        // epoch now (most of them: a few instructions), 0 for an empty slot (the book is not full: the IPO fails and nothing is issued) and the price
++        // otherwise. The indices up to the table are not queued: their names are the table's, never 'new'. At most one fill per epoch
++        // (nameQueueEpoch), so a second call in the same epoch adds nothing, and BEGIN_EPOCH of the next epoch empties the queue. If more
++        // indices end with a full book than the queue holds, the overflow flag is set and the pairing of this epoch refuses. With two or more
++        // queued, each gets the fingerprint of its final book (676 slots read, the bidder of each hashed and added): with one the pair is certain
++        // by count, and nothing is read. All of it is bounded: at most 993 scans, QPOOLK6_NAME_QUEUE_CAP x 676 reads.
++        if (state.get().nameQueueEpoch != (uint64)qpi.epoch())
++        {
++            state.mut().nameQueueEpoch = (uint64)qpi.epoch();
++            if (state.get().nameQueueLen != 0)
++            {
++                // A queue that BEGIN_EPOCH did not empty (it always does): not trusted, and not added to.
++                state.mut().nameQueueLen = 0;
++                state.mut().nameQueueOverflow = 1;
++            }
++            locals.qlen = 0;
++            for (locals.qi = QPOOLK6_KNOWN_CONTRACTS + 1; locals.qi <= QPOOLK6_MAX_CONTRACT_INDEX; locals.qi++)
++            {
++                locals.qprice = qpi.ipoBidPrice((uint32)locals.qi, (uint32)NUMBER_OF_COMPUTORS - 1);
++                if (locals.qprice == -1) break;
++                if (locals.qprice <= 0) continue;
++                if (locals.qlen >= QPOOLK6_NAME_QUEUE_CAP)
++                {
++                    state.mut().nameQueueOverflow = 1;
++                    break;
++                }
++                state.mut().nameQueue.set(locals.qlen, locals.qi);
++                locals.qlen = locals.qlen + 1;
++            }
++            state.mut().nameQueueLen = locals.qlen;
++            if (locals.qlen >= 2 && state.get().nameQueueOverflow == 0)
++            {
++                for (locals.qj = 0; locals.qj < locals.qlen; locals.qj++)
++                {
++                    locals.qfp = 0;
++                    for (locals.qs = 0; locals.qs < (uint64)NUMBER_OF_COMPUTORS; locals.qs++)
++                    {
++                        locals.qfp = locals.qfp
++                            + qpi.K12(qpi.ipoBidId((uint32)state.get().nameQueue.get(locals.qj), (uint32)locals.qs)).u64._0;
++                    }
++                    state.mut().nameQueueFp.set(locals.qj, locals.qfp);
++                }
++            }
++        }
++
+         // ---- The revenue split: 40 / 30 / 20 / 10 (see the constants). No minimum: whatever revenue exists is split. ----
+         qpi.getEntity(SELF, locals.ent);
+         locals.contractBalance = locals.ent.incomingAmount - locals.ent.outgoingAmount;
+@@ -6285,7 +7224,14 @@
+         // 30 percent: a plain QU transfer to the QPAYHUB contract. Its POST_INCOMING_TRANSFER books it into its fee pool, which it splits
+         // at its own END_EPOCH (above a reserve it never distributes) between its shareholders, a burn and the holders of the QPAY token.
+         // A transfer that fails leaves this part to the burn leg below: it is never lost and never counted twice.
++        // The core's transfer does not check that the destination is a contract: QU sent to id(index, 0, 0, 0) with no contract at
++        // that index would land on a key nobody can spend from and still return success, so it would be booked as deposited. The probe
++        // qpi.isContractId(id(index, 0, 0, 0)) answers whether the index is below the node's contract count (true) or beyond it
++        // (false); when it is false nothing is sent, nothing is booked, and the whole leg falls into the burn leg like any unpayable
++        // one. It proves only that SOME contract slot exists at that index, not that it is QPAYHUB (nor that it is already
++        // constructed): the index table must still be checked against the network's contract_def.h on proposal day.
+         if (locals.qpayhubCut > 0 && locals.qpayhubCut <= locals.contractBalance
++            && qpi.isContractId(id(QPOOLK6_QPAYHUB_CONTRACT_INDEX, 0, 0, 0))
+             && qpi.transfer(id(QPOOLK6_QPAYHUB_CONTRACT_INDEX, 0, 0, 0), (sint64)locals.qpayhubCut) >= 0)
+         {
+             locals.distributed = sadd(locals.distributed, locals.qpayhubCut);
