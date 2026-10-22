@@ -1,0 +1,11 @@
+pool,name,kind,creator,members,persona
+P1,Alpha,public,U01,U09 U10 U11 U12 U13 U14 U15 U71 U72 U73 U74 U75 U76 U77 U78 U79 U80 U81 U82 U83 U84 U85 U86,QX trader + IPO regular
+P2,Beta,public,U02,U16 U17 U18 U19 U20 U09 U10 U47 U48 U49 U50 U85 U86 U87 U88 U89 U90 U91 U92 U93 U94 U95 U96 U97 U98 U99 U100,aggressive IPO hunter
+P3,Gamma,private,U03,U21 U22 U23 U24 U11 U59 U60 U61 U62 U63 U64 U65 U66,"dividend-yield pool, private, creator deposits TOK2"
+P4,Delta,public,U04,U25 U26 U27 U28 U12 U47 U48 U49 U50 U51 U52 U53 U54 U55 U56 U57 U58,QSWAP trader
+P5,Epsilon,private,U05,U29 U30 U13 U21 U75 U76 U77 U78 U79 U80,conservative private IPO pool
+P6,Zeta,public,U06,U14 U15 U16 U22 U25 U29 U30 U51 U52 U53 U54 U55 U56 U57 U58 U59 U60 U61 U62 U63 U64 U65 U66 U67 U68 U69 U70,"mixed: QX, QSWAP and IPO"
+P7,Eta,public,U07,U17 U23 U26 U30 U81 U82 U83 U84,"small pool, seat-market heavy"
+P8,Theta,private,U08,U18 U24 U27 U28 U67 U68 U69 U70 U71 U72 U73 U74,"private pool that toggles public, deposits TOK1"
+P9,Iota,public,U41,U19 U20 U24 U47 U48 U49 U50 U51 U52 U53 U54 U55 U56 U57 U58 U59 U60 U61 U62 U63 U64 U65 U66 U67 U68 U69 U70 U71 U72 U73 U74 U75 U76 U77 U78 U79 U80 U81 U82 U83 U84,"large public pool: QX trader and IPO regular, many small members"
+P10,Kappa,private,U42,U28 U15 U87 U88 U89 U90 U91 U92 U93 U94 U95 U96 U97 U98 U99 U100,private IPO syndicate

@@ -1,0 +1,152 @@
+== N2: settle at BEGIN_EPOCH (T1,T4)
+Running main() from ../src/gtest_main.cc
+[==========] Running 4 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 4 tests from QPoolSettleProbe
+[ RUN      ] QPoolSettleProbe.T1_all_ready_holdings_settle_at_begin_epoch
+QPOOL_SETTLE_PROBE T1 stats: ready=0 epoch=138 done=4 skipped=0 total=4
+QPOOL_SETTLE_PROBE T1 holding 0: settled=1 shares=5 costBasis=4590 name=42584554534554
+QPOOL_SETTLE_PROBE T1 holding 1: settled=1 shares=4 costBasis=3672 name=42584554534554
+QPOOL_SETTLE_PROBE T1 holding 2: settled=1 shares=4 costBasis=3672 name=42584554534554
+[       OK ] QPoolSettleProbe.T1_all_ready_holdings_settle_at_begin_epoch (5118 ms)
+[ RUN      ] QPoolSettleProbe.T2_more_ready_than_the_bound
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N2/scratch/settle_probe.cpp:315: Skipped
+built with the production bound (32): the backlog path needs a small bound
+
+[  SKIPPED ] QPoolSettleProbe.T2_more_ready_than_the_bound (0 ms)
+[ RUN      ] QPoolSettleProbe.T3_refused_holdings_do_not_starve_the_rest
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N2/scratch/settle_probe.cpp:377: Skipped
+built with the production bound (32): this test needs a bound of 2
+
+[  SKIPPED ] QPoolSettleProbe.T3_refused_holdings_do_not_starve_the_rest (0 ms)
+[ RUN      ] QPoolSettleProbe.T4_digest_of_the_books_after_settlement
+DIGEST manualCalls=0
+DIGEST holding 0: shares=5 cost=4590 settled=1 active=1 rows=3 incarnation=1 ppc=0:0 payouts=0 avail=0 atRisk=0 pending=0 name=42584554534554
+DIGEST pool 0: uncommitted=1598741 committed=4590 holdings=1 ipoHoldings=0 ownershipRows=3 offers=0
+DIGEST   member 0.0: contribution=1 uncommitted=987166 committed=2834 lastDeposit=88401  seat=1 cost=2834 claimable=0 debt=0:0
+DIGEST   member 0.1: contribution=1 uncommitted=267010 committed=767 lastDeposit=88401  seat=1 cost=767 claimable=0 debt=0:0
+DIGEST   member 0.2: contribution=1 uncommitted=344565 committed=989 lastDeposit=88401  seat=1 cost=989 claimable=0 debt=0:0
+DIGEST holding 1: shares=4 cost=3672 settled=1 active=1 rows=3 incarnation=2 ppc=0:0 payouts=0 avail=0 atRisk=0 pending=0 name=42584554534554
+DIGEST pool 1: uncommitted=1599659 committed=3672 holdings=1 ipoHoldings=0 ownershipRows=3 offers=0
+DIGEST   member 1.0: contribution=1 uncommitted=987732 committed=2268 lastDeposit=88401  seat=1 cost=2268 claimable=0 debt=0:0
+DIGEST   member 1.1: contribution=1 uncommitted=267164 committed=613 lastDeposit=88401  seat=1 cost=613 claimable=0 debt=0:0
+DIGEST   member 1.2: contribution=1 uncommitted=344763 committed=791 lastDeposit=88401  seat=1 cost=791 claimable=0 debt=0:0
+DIGEST holding 2: shares=4 cost=3672 settled=1 active=1 rows=3 incarnation=3 ppc=0:0 payouts=0 avail=0 atRisk=0 pending=0 name=42584554534554
+DIGEST pool 2: uncommitted=1599659 committed=3672 holdings=1 ipoHoldings=0 ownershipRows=3 offers=0
+DIGEST   member 2.0: contribution=1 uncommitted=987732 committed=2268 lastDeposit=88401  seat=1 cost=2268 claimable=0 debt=0:0
+DIGEST   member 2.1: contribution=1 uncommitted=267164 committed=613 lastDeposit=88401  seat=1 cost=613 claimable=0 debt=0:0
+DIGEST   member 2.2: contribution=1 uncommitted=344763 committed=791 lastDeposit=88401  seat=1 cost=791 claimable=0 debt=0:0
+DIGEST holding 3: shares=0 cost=0 settled=1 active=0 rows=0 incarnation=0 ppc=0:0 payouts=0 avail=0 atRisk=0 pending=0 name=0
+DIGEST pool 3: uncommitted=1603331 committed=0 holdings=0 ipoHoldings=0 ownershipRows=0 offers=0
+DIGEST   member 3.0: contribution=1 uncommitted=990000 committed=0 lastDeposit=88401  seat=0 cost=0 claimable=0 debt=0:0
+DIGEST   member 3.1: contribution=1 uncommitted=267777 committed=0 lastDeposit=88401  seat=0 cost=0 claimable=0 debt=0:0
+DIGEST   member 3.2: contribution=1 uncommitted=345554 committed=0 lastDeposit=88401  seat=0 cost=0 claimable=0 debt=0:0
+DIGEST ledger 32: acc=0:0 accrued=0:0 credited=0:0 name=42584554534554 holdings=3 recognized=13 unsettled=0 escrow=0
+DIGEST globals: refundEscrow=0 totalRefunded=24082 escrowTotal=0 holdingFreeHint=3 pendingRevenue=0 ipoBids=0 ipoSeats=0 ipoPrices=0
+[       OK ] QPoolSettleProbe.T4_digest_of_the_books_after_settlement (5359 ms)
+[----------] 4 tests from QPoolSettleProbe (10478 ms total)
+
+[----------] Global test environment tear-down
+[==========] 4 tests from 1 test suite ran. (10478 ms total)
+[  PASSED  ] 2 tests.
+[  SKIPPED ] 2 tests, listed below:
+[  SKIPPED ] QPoolSettleProbe.T2_more_ready_than_the_bound
+[  SKIPPED ] QPoolSettleProbe.T3_refused_holdings_do_not_starve_the_rest
+== N1: name-free IPO
+Running main() from ../src/gtest_main.cc
+[==========] Running 8 tests from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 8 tests from QPoolNameProbe
+[ RUN      ] QPoolNameProbe.A_baseline_two_ipos_pair_by_book_then_single
+QPOOL_NAME_PROBE A walk before rebuild: OLDNAM1 OLDNAM2 QX TESTEXB TESTEXC
+QPOOL_NAME_PROBE A walk after rebuild:  OLDNAM1 OLDNAM2 QX TESTEXB TESTEXC
+[       OK ] QPoolNameProbe.A_baseline_two_ipos_pair_by_book_then_single (5444 ms)
+[ RUN      ] QPoolNameProbe.B_identical_books_are_quarantined_then_recovery
+[       OK ] QPoolNameProbe.B_identical_books_are_quarantined_then_recovery (5953 ms)
+[ RUN      ] QPoolNameProbe.C_counts_differ_are_quarantined
+[       OK ] QPoolNameProbe.C_counts_differ_are_quarantined (4651 ms)
+[ RUN      ] QPoolNameProbe.D_walk_order_after_the_core_rebuild
+QPOOL_NAME_PROBE D trials=12 walk_in_issuance_order_before_rebuild=12 walk_reversed_after_rebuild=7
+[       OK ] QPoolNameProbe.D_walk_order_after_the_core_rebuild (21958 ms)
+[ RUN      ] QPoolNameProbe.E_pairing_is_right_whatever_the_walk_order
+QPOOL_NAME_PROBE E trials=14 walk_reversed=9 paired_right=14 quarantined=0
+[       OK ] QPoolNameProbe.E_pairing_is_right_whatever_the_walk_order (23967 ms)
+[ RUN      ] QPoolNameProbe.F_settle_waits_for_the_name_then_binds_it
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:395: Failure
+Expected equality of these values:
+  o.returnCode
+    Which is: 41
+  40u
+    Which is: 40
+
+[  FAILED  ] QPoolNameProbe.F_settle_waits_for_the_name_then_binds_it (3612 ms)
+[ RUN      ] QPoolNameProbe.G_propose_checks_the_registry_and_takes_no_ipo_name
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:463: Failure
+Expected equality of these values:
+  propose(c1, 2, UNKNOWN, 34, 10000)
+    Which is: 41
+  40u
+    Which is: 40
+
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:464: Failure
+Expected equality of these values:
+  propose(c1, 2, UNPAIRED, 34, 10000)
+    Which is: 41
+  40u
+    Which is: 40
+
+[  FAILED  ] QPoolNameProbe.G_propose_checks_the_registry_and_takes_no_ipo_name (3547 ms)
+[ RUN      ] QPoolNameProbe.H_end_to_end_ipo_without_a_name
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:531: Failure
+Expected equality of these values:
+  o.returnCode
+    Which is: 41
+  40u
+    Which is: 40
+
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:540: Failure
+Expected equality of these values:
+  o.returnCode
+    Which is: 18
+  0u
+    Which is: 0
+
+/private/tmp/claude-501/-Volumes-phildata-Github-qpool/bf5af256-2a64-4ee8-b625-cdaa0f93d688/scratchpad/k7/work/N1/scratch/name_probe.cpp:541: Failure
+Expected equality of these values:
+  o.shares
+    Which is: 0
+  5u
+    Which is: 5
+
+QPOOL_NAME_PROBE H settled: shares=0 returnedToMembers=0 costBasisNow=4585
+[  FAILED  ] QPoolNameProbe.H_end_to_end_ipo_without_a_name (5129 ms)
+[----------] 8 tests from QPoolNameProbe (74273 ms total)
+
+[----------] Global test environment tear-down
+[==========] 8 tests from 1 test suite ran. (74274 ms total)
+[  PASSED  ] 5 tests.
+[  FAILED  ] 3 tests, listed below:
+[  FAILED  ] QPoolNameProbe.F_settle_waits_for_the_name_then_binds_it
+[  FAILED  ] QPoolNameProbe.G_propose_checks_the_registry_and_takes_no_ipo_name
+[  FAILED  ] QPoolNameProbe.H_end_to_end_ipo_without_a_name
+
+ 3 FAILED TESTS
+== N3: settled IPO holding rests a sell (T5, K8.3)
+Running main() from ../src/gtest_main.cc
+Note: Google Test filter = *T5*
+[==========] Running 1 test from 1 test suite.
+[----------] Global test environment set-up.
+[----------] 1 test from QPoolSettleProbe
+[ RUN      ] QPoolSettleProbe.T5_a_settled_ipo_holding_rests_a_sell_and_sells_out
+STEP settled N=5
+STEP executed ret=0
+STEP before dividend
+STEP after dividend escrow=9900
+STEP before the buyer
+[       OK ] QPoolSettleProbe.T5_a_settled_ipo_holding_rests_a_sell_and_sells_out (5378 ms)
+[----------] 1 test from QPoolSettleProbe (5378 ms total)
+
+[----------] Global test environment tear-down
+[==========] 1 test from 1 test suite ran. (5379 ms total)
+[  PASSED  ] 1 test.
+ALL DONE

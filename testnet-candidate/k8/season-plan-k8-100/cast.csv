@@ -1,0 +1,101 @@
+user,role,pools
+U01,creator of pool P1,P1
+U02,creator of pool P2,P2
+U03,creator of pool P3,P3
+U04,creator of pool P4,P4
+U05,creator of pool P5,P5
+U06,creator of pool P6,P6
+U07,creator of pool P7,P7
+U08,creator of pool P8,P8
+U09,member (in 1 to 3 pools),"P1,P2"
+U10,member (in 1 to 3 pools),"P1,P2"
+U11,member (in 1 to 3 pools),"P1,P3"
+U12,member (in 1 to 3 pools),"P1,P4"
+U13,member (in 1 to 3 pools),"P1,P5"
+U14,member (in 1 to 3 pools),"P1,P6"
+U15,member (in 1 to 3 pools),"P1,P6,P10"
+U16,member (in 1 to 3 pools),"P2,P6"
+U17,member (in 1 to 3 pools),"P2,P7"
+U18,member (in 1 to 3 pools),"P2,P8"
+U19,member (in 1 to 3 pools),"P2,P9"
+U20,member (in 1 to 3 pools),"P2,P9"
+U21,member (in 1 to 3 pools),"P3,P5"
+U22,member (in 1 to 3 pools),"P3,P6"
+U23,member (in 1 to 3 pools),"P3,P7"
+U24,member (in 1 to 3 pools),"P3,P8,P9"
+U25,member (in 1 to 3 pools),"P4,P6"
+U26,member (in 1 to 3 pools),"P4,P7"
+U27,member (in 1 to 3 pools),"P4,P8"
+U28,member (in 1 to 3 pools),"P4,P8,P10"
+U29,member (in 1 to 3 pools),"P5,P6"
+U30,member (in 1 to 3 pools),"P5,P6,P7"
+U31,market maker MM1 (sells TOK1 on QX),
+U32,market maker MM2 (sells TOK2 on QX),
+U33,"market maker MM3 (QX bids, QPAY asks)",
+U34,LP: QSWAP liquidity TOK1/QU,
+U35,"ISSUER1: issues TOK1, pays dividends",
+U36,"ISSUER2: issues TOK2, pays dividends",
+U37,OUT1: IPO outsider and trader,
+U38,OUT2: IPO outsider and sniper,
+U39,OUT3: IPO outsider,
+U40,"KEEPER and ATTACKER (non-member, permissionless calls, hostile inputs)",
+U41,creator of pool P9,P9
+U42,creator of pool P10,P10
+U43,OUT4: IPO outsider,
+U44,OUT5: IPO outsider and sniper,
+U45,OUT6: IPO outsider,
+U46,market maker MM4 (TOK1 asks from epoch 4 on),
+U47,member (in 1 to 3 pools),"P2,P4,P9"
+U48,member (in 1 to 3 pools),"P2,P4,P9"
+U49,member (in 1 to 3 pools),"P2,P4,P9"
+U50,member (in 1 to 3 pools),"P2,P4,P9"
+U51,member (in 1 to 3 pools),"P4,P6,P9"
+U52,member (in 1 to 3 pools),"P4,P6,P9"
+U53,member (in 1 to 3 pools),"P4,P6,P9"
+U54,member (in 1 to 3 pools),"P4,P6,P9"
+U55,member (in 1 to 3 pools),"P4,P6,P9"
+U56,member (in 1 to 3 pools),"P4,P6,P9"
+U57,member (in 1 to 3 pools),"P4,P6,P9"
+U58,member (in 1 to 3 pools),"P4,P6,P9"
+U59,member (in 1 to 3 pools),"P3,P6,P9"
+U60,member (in 1 to 3 pools),"P3,P6,P9"
+U61,member (in 1 to 3 pools),"P3,P6,P9"
+U62,member (in 1 to 3 pools),"P3,P6,P9"
+U63,member (in 1 to 3 pools),"P3,P6,P9"
+U64,member (in 1 to 3 pools),"P3,P6,P9"
+U65,member (in 1 to 3 pools),"P3,P6,P9"
+U66,member (in 1 to 3 pools),"P3,P6,P9"
+U67,member (in 1 to 3 pools),"P6,P8,P9"
+U68,member (in 1 to 3 pools),"P6,P8,P9"
+U69,member (in 1 to 3 pools),"P6,P8,P9"
+U70,member (in 1 to 3 pools),"P6,P8,P9"
+U71,member (in 1 to 3 pools),"P1,P8,P9"
+U72,member (in 1 to 3 pools),"P1,P8,P9"
+U73,member (in 1 to 3 pools),"P1,P8,P9"
+U74,member (in 1 to 3 pools),"P1,P8,P9"
+U75,member (in 1 to 3 pools),"P1,P5,P9"
+U76,member (in 1 to 3 pools),"P1,P5,P9"
+U77,member (in 1 to 3 pools),"P1,P5,P9"
+U78,member (in 1 to 3 pools),"P1,P5,P9"
+U79,member (in 1 to 3 pools),"P1,P5,P9"
+U80,member (in 1 to 3 pools),"P1,P5,P9"
+U81,member (in 1 to 3 pools),"P1,P7,P9"
+U82,member (in 1 to 3 pools),"P1,P7,P9"
+U83,member (in 1 to 3 pools),"P1,P7,P9"
+U84,member (in 1 to 3 pools),"P1,P7,P9"
+U85,member (in 1 to 3 pools),"P1,P2"
+U86,member (in 1 to 3 pools),"P1,P2"
+U87,member (in 1 to 3 pools),"P2,P10"
+U88,member (in 1 to 3 pools),"P2,P10"
+U89,member (in 1 to 3 pools),"P2,P10"
+U90,member (in 1 to 3 pools),"P2,P10"
+U91,member (in 1 to 3 pools),"P2,P10"
+U92,member (in 1 to 3 pools),"P2,P10"
+U93,member (in 1 to 3 pools),"P2,P10"
+U94,member (in 1 to 3 pools),"P2,P10"
+U95,member (in 1 to 3 pools),"P2,P10"
+U96,member (in 1 to 3 pools),"P2,P10"
+U97,member (in 1 to 3 pools),"P2,P10"
+U98,member (in 1 to 3 pools),"P2,P10"
+U99,member (in 1 to 3 pools),"P2,P10"
+U100,member (in 1 to 3 pools),"P2,P10"

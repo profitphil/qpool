@@ -1,0 +1,249 @@
+### T1 (epoch 2): 4 pools
+  P1 Execute: budget 200,000 at opening 2,000 -> 100 seats, free 0
+  P2 Execute: budget 260,000 at opening 2,100 -> 123 seats, free 1,700
+  P5 Execute: budget 150,000 at opening 1,800 -> 83 seats, free 600
+  P6 Execute: budget 240,000 at opening 2,200 -> 109 seats, free 200
+  OUT1 bids 261 @ 1,900  -> book 676 slots, lowest 1,800
+  OUT3 bids 29 @ 2,039 -> refunds P5 +52,200
+  OUT3 bids 12 @ 1,898 -> refunds P5 +21,600
+  OUT2 bids 40 @ 2,123 -> refunds P5 +72,000
+  P1 RebidIpo @ 2,029 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,076 -> INSUFFICIENT_BALANCE
+  OUT2 bids 42 @ 2,032 -> refunds OUT1 +53,200, OUT3 +22,776, P5 +3,600
+  P2 RebidIpo @ 1 -> PRICE_TOO_LOW
+  P1 RebidIpo @ 1,998 -> INSUFFICIENT_BALANCE
+  OUT1 bids 21 @ 2,138 -> refunds none
+  OUT3 bids 34 @ 2,001 -> refunds OUT1 +64,600
+  P5 RebidIpo @ 2,156 -> OK, 69 seats
+  P1 RebidIpo @ 1,901 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 1,901 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,106 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 1,935 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 1,900 -> PRICE_TOO_LOW
+  OUT2 bids 27 @ 2,104 -> refunds OUT1 +51,300
+  P2 RebidIpo @ 2,039 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 2,071 -> INSUFFICIENT_BALANCE
+  OUT1 bids 16 @ 1,969 -> refunds none
+  P1 RebidIpo @ 1,900 -> PRICE_TOO_LOW
+  P2 RebidIpo @ 2,130 -> INSUFFICIENT_BALANCE
+  STRANGER rebids for P2: refused
+  OUT1 bids 18 @ 1,901 -> refunds none
+  OUT2 bids 14 @ 1,911 -> refunds OUT1 +26,600
+  P6 RebidIpo @ 2,196 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,010 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,069 -> INSUFFICIENT_BALANCE
+  OUT1 bids 6 @ 1,939 -> refunds none
+  P2 RebidIpo @ 1,908 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 1,966 -> INSUFFICIENT_BALANCE
+  OUT1 bids 12 @ 2,098 -> refunds none
+  P2 RebidIpo @ 1,901 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 1,900 -> PRICE_TOO_LOW
+  SNIPE OUT2 bids 60 @ 2,650 in the last ticks
+  END OF EPOCH 2: final price 1,969
+    P1: {'seats': 100, 'shares': 100, 'costBasis': 196900, 'returned': 3100}
+    P2: {'seats': 123, 'shares': 123, 'costBasis': 242187, 'returned': 17813}
+    P5: {'seats': 69, 'shares': 69, 'costBasis': 135861, 'returned': 14139}
+    P6: {'seats': 109, 'shares': 109, 'costBasis': 214621, 'returned': 25379}
+    OUT1: {'seats': 43, 'shares': 43, 'spent': 84667, 'returned': 411233}
+
+### T2 (epoch 4): 5 pools
+  P2 Execute: budget 300,000 at opening 2,000 -> 150 seats, free 0
+  P3 Execute: budget 150,000 at opening 1,500 -> 100 seats, free 0
+  P4 Execute: budget 200,000 at opening 1,800 -> 111 seats, free 200
+  P6 Execute: budget 180,000 at opening 1,700 -> 105 seats, free 1,500
+  P7 Execute: budget 80,000 at opening 1,600 -> 50 seats, free 0
+  OUT1 bids 160 @ 1,550  -> book 676 slots, lowest 1,500
+  P6 RebidIpo @ 1,715 -> INSUFFICIENT_BALANCE
+  OUT1 bids 33 @ 1,744 -> refunds P3 +49,500
+  P7 RebidIpo @ 1,771 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 1,690 -> INSUFFICIENT_BALANCE
+  P3 RebidIpo @ 1,619 -> OK, 30 seats
+  P2 RebidIpo @ 1,501 -> INSUFFICIENT_BALANCE
+  P7 RebidIpo @ 1,755 -> INSUFFICIENT_BALANCE
+  P4 RebidIpo @ 1,500 -> IPO_PRICE_TAKEN
+  P2 RebidIpo @ 1,733 -> INSUFFICIENT_BALANCE
+  OUT3 bids 26 @ 1,676 -> refunds P3 +39,000
+  OUT1 bids 43 @ 1,596 -> refunds P3 +16,500
+  P6 RebidIpo @ 1,671 -> INSUFFICIENT_BALANCE
+  P3 RebidIpo @ 1,848 -> OK, 54 seats
+  P2 RebidIpo @ 1,837 -> INSUFFICIENT_BALANCE
+  OUT2 bids 22 @ 1,653 -> refunds OUT1 +34,100
+  P7 RebidIpo @ 1,760 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 1,807 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 1,748 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 1,632 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 1,586 -> INSUFFICIENT_BALANCE
+  OUT3 bids 36 @ 1,714 -> refunds OUT1 +55,800
+  OUT1 bids 43 @ 1,643 -> refunds none
+  P4 RebidIpo @ 1,767 -> INSUFFICIENT_BALANCE
+  OUT2 bids 7 @ 1,722 -> refunds OUT1 +11,172
+  P2 RebidIpo @ 1,686 -> INSUFFICIENT_BALANCE
+  P3 RebidIpo @ 1,615 -> OK, 1 seats
+  OUT3 bids 27 @ 1,720 -> refunds OUT1 +12,768, P7 +30,400
+  P7 RebidIpo @ 1,608 -> OK, 18 seats
+  OUT3 bids 43 @ 1,793 -> refunds P3 +19,424, P7 +49,744
+  P3 RebidIpo @ 1,703 -> OK, 11 seats
+  P6 RebidIpo @ 1,828 -> INSUFFICIENT_BALANCE
+  P4 RebidIpo @ 1,646 -> INSUFFICIENT_BALANCE
+  P4 RebidIpo @ 1,619 -> IPO_PRICE_TAKEN
+  P4 RebidIpo @ 1,694 -> INSUFFICIENT_BALANCE
+  STRANGER rebids for P6: refused
+  STRANGER rebids for P7: refused
+  END OF EPOCH 4: final price 1,619
+    P2: {'seats': 150, 'shares': 150, 'costBasis': 242850, 'returned': 57150}
+    P3: {'seats': 73, 'shares': 73, 'costBasis': 118187, 'returned': 31813}
+    P4: {'seats': 111, 'shares': 111, 'costBasis': 179709, 'returned': 20291}
+    P6: {'seats': 105, 'shares': 105, 'costBasis': 169995, 'returned': 10005}
+    P7: {'seats': 0, 'shares': 0, 'costBasis': 0, 'returned': 80000}
+    OUT1: {'seats': 76, 'shares': 76, 'spent': 123044, 'returned': 124956}
+
+### T3 (epoch 4): 3 pools
+  P1 Execute: budget 240,000 at opening 1,200 -> 200 seats, free 0
+  P5 Execute: budget 120,000 at opening 1,000 -> 120 seats, free 0
+  P8 Execute: budget 100,000 at opening 900 -> 111 seats, free 100
+  OUT1 bids 150 @ 800  -> book 581 slots, lowest 0
+  P1 RebidIpo @ 13 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 62 -> OK, 1 seats
+  P1 RebidIpo @ 138 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 92 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 1 -> OK, 38 seats
+  OUT2 bids 20 @ 160 -> refunds none
+  P1 RebidIpo @ 58 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 1 -> IPO_PRICE_TAKEN
+  P8 RebidIpo @ 264 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 95 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 273 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 289 -> INSUFFICIENT_BALANCE
+  END OF EPOCH 4: final price 0  (book not full: THE IPO FAILS, everything refunded)
+    P1: {'seats': 200, 'shares': 0, 'costBasis': 0, 'returned': 240000}
+    P5: {'seats': 120, 'shares': 0, 'costBasis': 0, 'returned': 120000}
+    P8: {'seats': 150, 'shares': 0, 'costBasis': 0, 'returned': 100000}
+    OUT1: {'seats': 150, 'shares': 0, 'spent': 0, 'returned': 120000}
+
+### T4 (epoch 6): 6 pools
+  P1 Execute: budget 250,000 at opening 2,500 -> 100 seats, free 0
+  P2 Execute: budget 350,000 at opening 2,600 -> 134 seats, free 1,600
+  P4 Execute: budget 200,000 at opening 2,400 -> 83 seats, free 800
+  P6 Execute: budget 300,000 at opening 2,550 -> 117 seats, free 1,650
+  P7 Execute: budget 100,000 at opening 2,300 -> 43 seats, free 1,100
+  P8 Execute: budget 150,000 at opening 2,200 -> 68 seats, free 400
+  OUT1 bids 131 @ 2,250  -> book 676 slots, lowest 2,200
+  P6 RebidIpo @ 2,258 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,223 -> INSUFFICIENT_BALANCE
+  P7 RebidIpo @ 2,319 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,217 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,475 -> INSUFFICIENT_BALANCE
+  OUT2 bids 38 @ 2,305 -> refunds P8 +83,600
+  P1 RebidIpo @ 2,211 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,306 -> INSUFFICIENT_BALANCE
+  OUT2 bids 16 @ 2,506 -> refunds P8 +35,200
+  P8 RebidIpo @ 2,312 -> OK, 51 seats
+  OUT3 bids 4 @ 2,531 -> refunds OUT1 +9,000
+  P2 RebidIpo @ 2,433 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,443 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,522 -> OK, 12 seats
+  P2 RebidIpo @ 2,250 -> PRICE_TOO_LOW
+  P8 RebidIpo @ 2,363 -> INSUFFICIENT_BALANCE
+  P4 RebidIpo @ 2,423 -> INSUFFICIENT_BALANCE
+  P7 RebidIpo @ 2,453 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,251 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,537 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,349 -> INSUFFICIENT_BALANCE
+  OUT2 bids 43 @ 2,299 -> refunds OUT1 +96,750
+  OUT2 bids 42 @ 2,407 -> refunds OUT1 +78,750
+  P1 RebidIpo @ 2,532 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 2,506 -> INSUFFICIENT_BALANCE
+  OUT3 bids 18 @ 2,360 -> refunds OUT2 +41,382
+  P8 RebidIpo @ 2,361 -> INSUFFICIENT_BALANCE
+  P4 RebidIpo @ 2,383 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 2,329 -> INSUFFICIENT_BALANCE
+  OUT3 bids 24 @ 2,442 -> refunds OUT2 +41,382, P7 +13,800
+  OUT2 bids 38 @ 2,626 -> refunds P7 +85,100
+  P1 RebidIpo @ 2,554 -> INSUFFICIENT_BALANCE
+  P7 RebidIpo @ 1 -> PRICE_TOO_LOW
+  P6 RebidIpo @ 2,546 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,355 -> INSUFFICIENT_BALANCE
+  OUT2 bids 12 @ 2,534 -> refunds none
+  P2 RebidIpo @ 2,369 -> INSUFFICIENT_BALANCE
+  OUT1 bids 20 @ 2,404 -> refunds OUT2 +46,100
+  P2 RebidIpo @ 1 -> PRICE_TOO_LOW
+  P7 RebidIpo @ 2,405 -> OK, 41 seats
+  OUT2 bids 21 @ 2,552 -> refunds OUT3 +14,160, P8 +34,680
+  P4 RebidIpo @ 2,424 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,459 -> OK, 48 seats
+  STRANGER rebids for P6: refused
+  SNIPE OUT2 bids 70 @ 3,200 in the last ticks
+  END OF EPOCH 6: final price 2,442
+    P1: {'seats': 100, 'shares': 100, 'costBasis': 244200, 'returned': 5800}
+    P2: {'seats': 134, 'shares': 134, 'costBasis': 327228, 'returned': 22772}
+    P4: {'seats': 62, 'shares': 62, 'costBasis': 151404, 'returned': 48596}
+    P6: {'seats': 117, 'shares': 117, 'costBasis': 285714, 'returned': 14286}
+    P7: {'seats': 31, 'shares': 31, 'costBasis': 75702, 'returned': 24298}
+    P8: {'seats': 60, 'shares': 60, 'costBasis': 146520, 'returned': 3480}
+    OUT1: {'seats': 0, 'shares': 0, 'spent': 0, 'returned': 294750}
+
+### T5 (epoch 6): 2 pools
+  P3 Execute: budget 80,000 at opening 1,000 -> 80 seats, free 0
+  P5 Execute: budget 60,000 at opening 900 -> 66 seats, free 600
+  OUT1 bids 200 @ 800  -> book 346 slots, lowest 0
+  P3 RebidIpo @ 75 -> INSUFFICIENT_BALANCE
+  P3 RebidIpo @ 1 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 30 -> OK, 20 seats
+  P5 RebidIpo @ 1 -> INSUFFICIENT_BALANCE
+  OUT1 bids 47 @ 249 -> refunds none
+  P5 RebidIpo @ 104 -> INSUFFICIENT_BALANCE
+  P5 RebidIpo @ 62 -> INSUFFICIENT_BALANCE
+  OUT1 bids 29 @ 82 -> refunds none
+  P5 RebidIpo @ 26 -> INSUFFICIENT_BALANCE
+  OUT2 bids 11 @ 117 -> refunds none
+  OUT2 bids 11 @ 253 -> refunds none
+  OUT3 bids 37 @ 154 -> refunds none
+  OUT3 bids 50 @ 43 -> refunds none
+  P5 RebidIpo @ 118 -> INSUFFICIENT_BALANCE
+  END OF EPOCH 6: final price 0  (book not full: THE IPO FAILS, everything refunded)
+    P3: {'seats': 80, 'shares': 0, 'costBasis': 0, 'returned': 80000}
+    P5: {'seats': 86, 'shares': 0, 'costBasis': 0, 'returned': 60000}
+    OUT1: {'seats': 276, 'shares': 0, 'spent': 0, 'returned': 160000}
+
+### T6 (epoch 6): 4 pools
+  P2 Execute: budget 200,000 at opening 3,000 -> 66 seats, free 2,000
+  P6 Execute: budget 150,000 at opening 2,900 -> 51 seats, free 2,100
+  P1 Execute: budget 100,000 at opening 2,800 -> 35 seats, free 2,000
+  P8 Execute: budget 60,000 at opening 2,500 -> 24 seats, free 0
+  OUT1 bids 500 @ 2,700  -> book 676 slots, lowest 2,500
+  OUT1 bids 15 @ 2,824 -> refunds P8 +37,500
+  P8 RebidIpo @ 2,773 -> OK, 13 seats
+  P1 RebidIpo @ 2,971 -> INSUFFICIENT_BALANCE
+  OUT2 bids 41 @ 3,045 -> refunds OUT1 +110,700
+  P1 RebidIpo @ 2,912 -> INSUFFICIENT_BALANCE
+  OUT2 bids 48 @ 2,727 -> refunds OUT1 +129,600
+  OUT3 bids 28 @ 3,047 -> refunds OUT1 +75,600
+  P1 RebidIpo @ 2,985 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,864 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,888 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,700 -> PRICE_TOO_LOW
+  OUT3 bids 36 @ 2,856 -> refunds OUT1 +97,200
+  OUT2 bids 44 @ 2,795 -> refunds OUT1 +118,800
+  P2 RebidIpo @ 2,887 -> INSUFFICIENT_BALANCE
+  P6 RebidIpo @ 2,748 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,730 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 2,804 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,701 -> OK, 3 seats
+  OUT2 bids 32 @ 2,858 -> refunds OUT1 +86,400
+  P2 RebidIpo @ 2,947 -> INSUFFICIENT_BALANCE
+  OUT2 bids 43 @ 2,757 -> refunds OUT1 +116,100
+  P2 RebidIpo @ 2,978 -> INSUFFICIENT_BALANCE
+  P1 RebidIpo @ 1 -> PRICE_TOO_LOW
+  P2 RebidIpo @ 2,845 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,960 -> OK, 5 seats
+  P8 RebidIpo @ 2,947 -> INSUFFICIENT_BALANCE
+  P8 RebidIpo @ 2,863 -> INSUFFICIENT_BALANCE
+  P2 RebidIpo @ 2,795 -> INSUFFICIENT_BALANCE
+  OUT2 bids 12 @ 3,020 -> refunds OUT1 +32,400
+  P1 RebidIpo @ 2,701 -> IPO_PRICE_TAKEN
+  END OF EPOCH 6: final price 2,700
+    P2: {'seats': 66, 'shares': 66, 'costBasis': 178200, 'returned': 21800}
+    P6: {'seats': 51, 'shares': 51, 'costBasis': 137700, 'returned': 12300}
+    P1: {'seats': 35, 'shares': 35, 'costBasis': 94500, 'returned': 5500}
+    P8: {'seats': 21, 'shares': 21, 'costBasis': 56700, 'returned': 3300}
+    OUT1: {'seats': 219, 'shares': 219, 'spent': 591300, 'returned': 758700}
