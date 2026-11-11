@@ -1,0 +1,44 @@
+import { useState } from 'react'
+import { useWallet } from '../context/WalletContext'
+import { submitProcedureCall } from '../qubic/transaction'
+import { payOfferPosition } from '../qubic/encode'
+import { QPOOLK6, P_OFFER_POSITION } from '../qubic/config'
+import { useAction } from '../hooks/useAction'
+import { Button, ErrorText, Field, SuccessText, TextInput } from './ui'
+
+export function OfferPositionForm({ holdingId, onChanged }: { holdingId: number; onChanged?: () => void }) {
+  const { wallet } = useWallet()
+  const [costUnits, setCostUnits] = useState('')
+  const [askPrice, setAskPrice] = useState('')
+  const { busy, error, result, run } = useAction<string>()
+
+  if (!wallet) return null
+
+  async function submit() {
+    await run(async () => {
+      const payload = payOfferPosition(holdingId, BigInt(costUnits), BigInt(askPrice))
+      const r = await submitProcedureCall(wallet!, QPOOLK6, P_OFFER_POSITION, 0, payload)
+      onChanged?.()
+      return `Submitted at tick ${r.tick} -- check "my position" below to confirm it's actually listed (needs you to own that many cost units of this holding).`
+    })
+  }
+
+  return (
+    <div className="space-y-1 border-t border-neutral-200 dark:border-neutral-800 pt-1 mt-1">
+      <div className="text-xs font-semibold">Offer part of my position for sale</div>
+      <div className="flex gap-2 flex-wrap items-end">
+        <Field label="Cost units to sell">
+          <TextInput value={costUnits} onChange={(e) => setCostUnits(e.target.value)} inputMode="numeric" className="w-28" />
+        </Field>
+        <Field label="Ask price (total QU)">
+          <TextInput value={askPrice} onChange={(e) => setAskPrice(e.target.value)} inputMode="numeric" className="w-28" />
+        </Field>
+        <Button disabled={busy || !costUnits || !askPrice} onClick={() => void submit()}>
+          {busy ? '...' : 'OfferPosition'}
+        </Button>
+      </div>
+      <ErrorText>{error}</ErrorText>
+      <SuccessText>{result}</SuccessText>
+    </div>
+  )
+}
