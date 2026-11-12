@@ -74,9 +74,16 @@ export function ProposeForm({ poolId, onChanged }: { poolId: number; onChanged?:
         </>
       )}
       {isIpo && <div className="text-xs text-muted-foreground">BUY_IPO never names an issuer/asset upfront (read from chain events at settlement).</div>}
-      <Field label="QU amount (budget)">
-        <TextInput value={quAmount} onChange={(e) => setQuAmount(e.target.value)} inputMode="numeric" />
+      <Field label="QU amount (budget) *">
+        <TextInput value={quAmount} onChange={(e) => setQuAmount(e.target.value)} inputMode="numeric" required />
       </Field>
+      {isIpo && (
+        <div className="text-xs text-muted-foreground">
+          There's no way to know how much the pool will have collected by the time this executes -- pick the most
+          QU you want to commit to this bid now. You can raise it later with RebidIpo if more comes in, but the
+          proposal itself needs a concrete number, not a guess at the pool's future balance.
+        </div>
+      )}
       <Field label="Shares (BUY_*: min-out / quantity)">
         <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
       </Field>
