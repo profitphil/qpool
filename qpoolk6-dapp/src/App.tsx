@@ -6,6 +6,7 @@ import { PoolsTab } from './components/PoolsTab'
 import { StatsPanel } from './components/StatsPanel'
 import { RegisterDividendPayerForm } from './components/RegisterDividendPayerForm'
 import { ReleaseManagedSharesForm } from './components/ReleaseManagedSharesForm'
+import { WalletLookup } from './components/WalletLookup'
 import { Button } from './components/ui'
 
 const TABS = ['Pools', 'Tools', 'Stats'] as const
@@ -38,6 +39,7 @@ export default function App() {
           {tab === 'Pools' && <PoolsTab />}
           {tab === 'Tools' && (
             <div className="space-y-4">
+              <WalletLookup />
               <RegisterDividendPayerForm />
               <ReleaseManagedSharesForm />
             </div>

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useWallet } from '../context/WalletContext'
 import { DEMO_WALLETS } from '../qubic/demoWallets'
+import { AssetList } from './AssetList'
 import { Button, ErrorText, Field, Select, TextInput } from './ui'
 
 export function WalletPanel() {
@@ -10,13 +11,16 @@ export function WalletPanel() {
 
   if (wallet) {
     return (
-      <div className="bg-card border-b border-border p-3 flex items-center gap-3 flex-wrap text-sm">
-        <span className="text-muted-foreground">Connected:</span>
-        <span className="font-mono text-xs break-all text-primary">{wallet.identity}</span>
-        <span className="text-muted-foreground">Balance:</span>
-        <span className="font-mono">{balance?.toLocaleString()} QU</span>
-        <Button onClick={() => void refreshBalance()}>refresh</Button>
-        <Button onClick={disconnect}>disconnect</Button>
+      <div className="bg-card border-b border-border p-3 space-y-2 text-sm">
+        <div className="flex items-center gap-3 flex-wrap">
+          <span className="text-muted-foreground">Connected:</span>
+          <span className="font-mono text-xs break-all text-primary">{wallet.identity}</span>
+          <span className="text-muted-foreground">Balance:</span>
+          <span className="font-mono">{balance?.toLocaleString()} QU</span>
+          <Button onClick={() => void refreshBalance()}>refresh</Button>
+          <Button onClick={disconnect}>disconnect</Button>
+        </div>
+        <AssetList identity={wallet.identity} />
       </div>
     )
   }
