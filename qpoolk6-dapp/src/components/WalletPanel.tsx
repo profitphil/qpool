@@ -1,10 +1,12 @@
 import { useState } from 'react'
 import { useWallet } from '../context/WalletContext'
-import { Button, ErrorText, TextInput } from './ui'
+import { DEMO_WALLETS } from '../qubic/demoWallets'
+import { Button, ErrorText, Field, Select, TextInput } from './ui'
 
 export function WalletPanel() {
   const { wallet, balance, connecting, error, connect, disconnect, refreshBalance } = useWallet()
   const [seed, setSeed] = useState('')
+  const [demoIndex, setDemoIndex] = useState(0)
 
   if (wallet) {
     return (
@@ -26,15 +28,32 @@ export function WalletPanel() {
         it is never sent anywhere, and is forgotten when you close or reload this tab. Never paste a seed that
         protects anything real.
       </div>
+      <div className="flex gap-2 items-end flex-wrap">
+        <Field label="No seed of your own? Try a pre-funded demo wallet">
+          <Select value={demoIndex} onChange={(e) => setDemoIndex(Number(e.target.value))} className="max-w-md">
+            {DEMO_WALLETS.map((w, i) => (
+              <option key={w.identity} value={i}>
+                {w.label}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Button variant="primary" disabled={connecting} onClick={() => void connect(DEMO_WALLETS[demoIndex].seed)}>
+          {connecting ? 'connecting...' : 'use this demo wallet'}
+        </Button>
+      </div>
+      <div className="text-xs text-muted-foreground">
+        These are shared -- if someone else is using the same one right now, pick a different number.
+      </div>
       <div className="flex gap-2 items-start flex-wrap">
         <TextInput
           type="password"
           value={seed}
           onChange={(e) => setSeed(e.target.value)}
-          placeholder="55-char lowercase seed"
+          placeholder="or paste your own 55-char lowercase seed"
           className="max-w-md"
         />
-        <Button variant="primary" disabled={connecting} onClick={() => void connect(seed)}>
+        <Button disabled={connecting} onClick={() => void connect(seed)}>
           {connecting ? 'connecting...' : 'connect wallet'}
         </Button>
       </div>
