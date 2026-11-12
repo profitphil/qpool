@@ -34,7 +34,7 @@ export function CreatePoolForm({ onCreated }: { onCreated?: () => void }) {
         <input type="checkbox" checked={permissioned} onChange={(e) => setPermissioned(e.target.checked)} />
         Permissioned (only admitted members can join/contribute)
       </label>
-      <div className="text-xs text-neutral-500">Fee: {CREATE_POOL_FEE.toLocaleString()} QU, paid by you.</div>
+      <div className="text-xs text-muted-foreground">Fee: {CREATE_POOL_FEE.toLocaleString()} QU, paid by you.</div>
       <Button disabled={busy || name.length < 1 || name.length > 8} onClick={() => void submit()}>
         {busy ? 'submitting...' : 'create pool'}
       </Button>

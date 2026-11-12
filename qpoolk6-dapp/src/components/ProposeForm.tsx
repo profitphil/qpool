@@ -73,7 +73,7 @@ export function ProposeForm({ poolId, onChanged }: { poolId: number; onChanged?:
           </Field>
         </>
       )}
-      {isIpo && <div className="text-xs text-neutral-500">BUY_IPO never names an issuer/asset upfront (read from chain events at settlement).</div>}
+      {isIpo && <div className="text-xs text-muted-foreground">BUY_IPO never names an issuer/asset upfront (read from chain events at settlement).</div>}
       <Field label="QU amount (budget)">
         <TextInput value={quAmount} onChange={(e) => setQuAmount(e.target.value)} inputMode="numeric" />
       </Field>

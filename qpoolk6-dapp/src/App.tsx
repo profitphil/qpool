@@ -16,16 +16,16 @@ export default function App() {
   return (
     <WalletProvider>
       <div className="min-h-screen max-w-5xl mx-auto">
-        <header className="p-4 border-b border-neutral-300 dark:border-neutral-700">
+        <header className="sticky top-0 z-50 bg-background border-b border-border p-4">
           <h1 className="text-lg font-bold">QPoolK6 testnet explorer</h1>
-          <p className="text-xs text-neutral-500">
+          <p className="text-xs text-muted-foreground">
             A live devnet running QPoolK6 -- browse real pools and submit real signed transactions against it.
           </p>
         </header>
         <WalletPanel />
-        <nav className="flex gap-1 p-3 border-b border-neutral-300 dark:border-neutral-700">
+        <nav className="flex gap-1 p-3 border-b border-border">
           {TABS.map((t) => (
-            <Button key={t} onClick={() => setTab(t)} className={tab === t ? 'bg-neutral-200 dark:bg-neutral-700' : ''}>
+            <Button key={t} variant={tab === t ? 'primary' : 'secondary'} onClick={() => setTab(t)}>
               {t}
             </Button>
           ))}

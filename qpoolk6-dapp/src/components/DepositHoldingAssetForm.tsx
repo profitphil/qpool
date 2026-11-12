@@ -28,7 +28,7 @@ export function DepositHoldingAssetForm({ poolId, onChanged }: { poolId: number;
 
   return (
     <div className="space-y-2">
-      <div className="text-xs text-neutral-500">
+      <div className="text-xs text-muted-foreground">
         Deposits a token you already own and have granted QPoolK6 management rights over (via QX's
         TransferShareManagementRights) into this pool, creating a new holding. Creator-only.
       </div>

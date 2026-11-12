@@ -33,7 +33,7 @@ export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onCh
   }
 
   return (
-    <div className="space-y-1 border-t border-neutral-200 dark:border-neutral-800 pt-1 mt-1">
+    <div className="space-y-1 border-t border-border pt-1 mt-1">
       <div className="text-xs font-semibold">IPO holding</div>
       <div className="flex gap-2 flex-wrap items-end">
         <Field label="New price">

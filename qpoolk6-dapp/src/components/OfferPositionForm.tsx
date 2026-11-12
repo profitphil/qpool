@@ -24,7 +24,7 @@ export function OfferPositionForm({ holdingId, onChanged }: { holdingId: number;
   }
 
   return (
-    <div className="space-y-1 border-t border-neutral-200 dark:border-neutral-800 pt-1 mt-1">
+    <div className="space-y-1 border-t border-border pt-1 mt-1">
       <div className="text-xs font-semibold">Offer part of my position for sale</div>
       <div className="flex gap-2 flex-wrap items-end">
         <Field label="Cost units to sell">

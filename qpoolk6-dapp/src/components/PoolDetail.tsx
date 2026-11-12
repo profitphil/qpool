@@ -48,7 +48,7 @@ export function PoolDetail({ poolId }: { poolId: number }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolId])
 
-  if (!pool) return <div className="text-sm text-neutral-500">Loading pool #{poolId}...</div>
+  if (!pool) return <div className="text-sm text-muted-foreground">Loading pool #{poolId}...</div>
   if (pool.found !== 1) return <ErrorText>Pool #{poolId} not found.</ErrorText>
 
   return (

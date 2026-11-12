@@ -34,7 +34,7 @@ export function MyPositionPanel({ holdingId, onChanged }: { holdingId: number; o
   }
 
   return (
-    <div className="space-y-1 border-t border-neutral-200 dark:border-neutral-800 pt-1 mt-1">
+    <div className="space-y-1 border-t border-border pt-1 mt-1">
       <Button disabled={check.busy} onClick={() => void load()}>
         {check.busy ? 'checking...' : 'check my position'}
       </Button>
@@ -52,7 +52,7 @@ export function MyPositionPanel({ holdingId, onChanged }: { holdingId: number; o
           )}
         </div>
       )}
-      {position && position.found !== 1 && <div className="text-xs text-neutral-500">You don't own any part of this holding.</div>}
+      {position && position.found !== 1 && <div className="text-xs text-muted-foreground">You don't own any part of this holding.</div>}
       <ErrorText>{cancel.error}</ErrorText>
       <SuccessText>{cancel.result}</SuccessText>
     </div>

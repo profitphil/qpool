@@ -25,7 +25,7 @@ export function HoldingRow({ id, holding, onChanged }: { id: number; holding: Ho
   }
 
   return (
-    <div className="border border-neutral-200 dark:border-neutral-800 rounded p-2 space-y-1">
+    <div className="border border-border rounded p-2 space-y-1">
       <div className="text-xs font-semibold">Holding #{id}</div>
       <KV k="asset" v={holding.assetNameStr || '(contract shares)'} />
       <KV k="issuer" v={holding.issuer} />

@@ -1,12 +1,35 @@
 @import "tailwindcss";
 
+/* Dark navy + cyan theme, matched to qraffles.com's shadcn-style palette. */
+@theme {
+  --color-background: #0c131b;
+  --color-foreground: #ffffff;
+  --color-card: #161f2b;
+  --color-card-foreground: #ffffff;
+  --color-border: #202e3c;
+  --color-input: #151e27;
+  --color-primary: #61f0fe;
+  --color-primary-foreground: #0c131b;
+  --color-muted: #151e27;
+  --color-muted-foreground: #9ca3af;
+  --color-accent: #152a30;
+  --color-accent-foreground: #61f0fe;
+  --color-destructive: #f97066;
+  --color-destructive-foreground: #381d1e;
+  --color-success: #47cd89;
+  --color-success-foreground: #11322d;
+  --color-ring: #61f0fe;
+}
+
 :root {
-  color-scheme: light dark;
+  color-scheme: dark;
 }
 
 body {
   margin: 0;
-  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  background: var(--color-background);
+  color: var(--color-foreground);
+  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
 }
 
 code, .mono {

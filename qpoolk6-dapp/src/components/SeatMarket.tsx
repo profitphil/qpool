@@ -28,7 +28,7 @@ function BuyRow({ offer, onChanged }: { offer: PoolOffer; onChanged?: () => void
   }
 
   return (
-    <div className="border border-neutral-200 dark:border-neutral-800 rounded p-2 space-y-1">
+    <div className="border border-border rounded p-2 space-y-1">
       <KV k="holdingId" v={offer.holdingId.toString()} />
       <KV k="seller" v={offer.seller} />
       <KV k="costUnits" v={offer.costUnits.toString()} />
@@ -71,7 +71,7 @@ export function SeatMarket({ poolId }: { poolId: number }) {
 
   return (
     <Card title={`Seat market (${offers.length} open offers)`}>
-      <div className="text-xs text-neutral-500">
+      <div className="text-xs text-muted-foreground">
         Open offers against this pool's holdings, from OfferPosition. Buying one calls BuyPosition with exactly
         this row's numbers -- if someone else bought it or the seller changed it first, the purchase is refused
         (OFFER_CHANGED), not silently adjusted.

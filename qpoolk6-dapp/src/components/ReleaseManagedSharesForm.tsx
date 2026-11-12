@@ -27,7 +27,7 @@ export function ReleaseManagedSharesForm() {
 
   return (
     <Card title="Release managed shares">
-      <div className="text-xs text-neutral-500">
+      <div className="text-xs text-muted-foreground">
         Reclaims shares you own that QPoolK6 manages but that never ended up in a pool holding (e.g. a deposit that
         got refused after the share transfer already happened). Attach the destination contract's own transfer fee
         if it has one (QX: index 1, charges a fee; most others don't).

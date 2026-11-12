@@ -25,7 +25,7 @@ export function RegisterDividendPayerForm() {
 
   return (
     <Card title="Register dividend payer">
-      <div className="text-xs text-neutral-500">
+      <div className="text-xs text-muted-foreground">
         Issuer-only: declares who the REAL dividend payer is for a token you issued, when it differs from your own
         identity (e.g. a staking contract that pays dividends on your token but isn't its registered issuer). Must
         be sent from the connected wallet, and that wallet must be this token's issuer -- your connected identity is{' '}

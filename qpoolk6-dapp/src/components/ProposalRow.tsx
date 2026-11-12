@@ -23,7 +23,7 @@ export function ProposalRow({ id, proposal, onChanged }: { id: number; proposal:
   const statusName = PROP_STATUS[Number(proposal.status)] ?? `UNKNOWN(${proposal.status})`
 
   return (
-    <div className="border border-neutral-200 dark:border-neutral-800 rounded p-2 space-y-1">
+    <div className="border border-border rounded p-2 space-y-1">
       <div className="text-xs font-semibold">Proposal #{id} -- {statusName}</div>
       <KV k="kind" v={proposal.kind.toString()} />
       <KV k="proposer" v={proposal.proposer} />
