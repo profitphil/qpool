@@ -45,7 +45,7 @@ export function ReleaseManagedSharesForm() {
         <TextInput value={destIndex} onChange={(e) => setDestIndex(e.target.value)} inputMode="numeric" />
       </Field>
       <Button disabled={busy || !issuerId || !assetName || !amount} onClick={() => void submit()}>
-        {busy ? 'submitting...' : 'ReleaseManagedShares'}
+        {busy ? 'submitting...' : 'Release shares'}
       </Button>
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>

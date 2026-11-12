@@ -27,14 +27,14 @@ export function OfferPositionForm({ holdingId, onChanged }: { holdingId: number;
     <div className="space-y-1 border-t border-border pt-1 mt-1">
       <div className="text-xs font-semibold">Offer part of my position for sale</div>
       <div className="flex gap-2 flex-wrap items-end">
-        <Field label="Cost units to sell">
+        <Field label="How much of your stake to sell">
           <TextInput value={costUnits} onChange={(e) => setCostUnits(e.target.value)} inputMode="numeric" className="w-28" />
         </Field>
-        <Field label="Ask price (total QU)">
+        <Field label="Asking price (total QU)">
           <TextInput value={askPrice} onChange={(e) => setAskPrice(e.target.value)} inputMode="numeric" className="w-28" />
         </Field>
         <Button disabled={busy || !costUnits || !askPrice} onClick={() => void submit()}>
-          {busy ? '...' : 'OfferPosition'}
+          {busy ? '...' : 'List for sale'}
         </Button>
       </div>
       <ErrorText>{error}</ErrorText>

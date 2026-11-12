@@ -25,11 +25,15 @@ export function ContributeForm({ poolId, onChanged }: { poolId: number; onChange
 
   return (
     <div className="space-y-2">
-      <Field label={`Contribute QU to pool #${poolId} (min ${MIN_CONTRIBUTION.toLocaleString()})`}>
+      <div className="text-xs text-muted-foreground">
+        There's no separate "join" step -- contributing QU is how you become a member of this pool. The first time
+        costs a small one-time join fee on top of your contribution; after that you're already a member.
+      </div>
+      <Field label={`Amount to contribute (min ${MIN_CONTRIBUTION.toLocaleString()} QU)`}>
         <TextInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000000" inputMode="numeric" />
       </Field>
-      <Button disabled={busy || !amount} onClick={() => void submit()}>
-        {busy ? 'submitting...' : 'Contribute'}
+      <Button variant="primary" disabled={busy || !amount} onClick={() => void submit()}>
+        {busy ? 'submitting...' : 'Join / contribute'}
       </Button>
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>

@@ -27,24 +27,24 @@ export function HoldingRow({ id, holding, onChanged }: { id: number; holding: Ho
   return (
     <div className="border border-border rounded p-2 space-y-1">
       <div className="text-xs font-semibold">Holding #{id}</div>
-      <KV k="asset" v={holding.assetNameStr || '(contract shares)'} />
-      <KV k="issuer" v={holding.issuer} />
-      <KV k="shares" v={holding.shares.toString()} />
-      <KV k="pendingShares" v={holding.pendingShares.toString()} />
-      <KV k="costBasis" v={holding.costBasis.toString()} />
-      <KV k="askShares / askPrice" v={`${holding.askShares} / ${holding.askPrice}`} />
-      <KV k="totalPayouts (claimable)" v={holding.totalPayouts.toString()} />
-      <KV k="active" v={holding.active.toString()} />
+      <KV k="token" v={holding.assetNameStr || 'pool shares'} />
+      <KV k="issued by" v={holding.issuer} />
+      <KV k="shares held" v={holding.shares.toString()} />
+      {holding.pendingShares > 0n && <KV k="pending (not settled yet)" v={holding.pendingShares.toString()} />}
+      <KV k="original cost" v={holding.costBasis.toString()} />
+      {holding.askShares > 0n && <KV k="resting sale on QX (shares / price)" v={`${holding.askShares} / ${holding.askPrice}`} />}
+      <KV k="claimable payout" v={holding.totalPayouts.toString()} />
+      {holding.active === 0n && <KV k="status" v="retired" />}
       {isIpo && (
         <>
-          <KV k="ipoContractIndex" v={holding.ipoContractIndex.toString()} />
-          <KV k="ipoSettled" v={holding.ipoSettled.toString()} />
-          <KV k="ipoMaxPrice / ipoAvailable / ipoAtRisk" v={`${holding.ipoMaxPrice} / ${holding.ipoAvailable} / ${holding.ipoAtRisk}`} />
+          <KV k="IPO target (contract index)" v={holding.ipoContractIndex.toString()} />
+          <KV k="IPO settled" v={holding.ipoSettled > 0n ? 'yes' : 'not yet'} />
+          <KV k="current bid / seats available / at risk if outbid" v={`${holding.ipoMaxPrice} / ${holding.ipoAvailable} / ${holding.ipoAtRisk}`} />
         </>
       )}
       {wallet && holding.totalPayouts > 0n && (
         <Button disabled={busy} onClick={() => void claim()}>
-          {busy ? 'claiming...' : 'ClaimPayout'}
+          {busy ? 'claiming...' : 'Claim payout'}
         </Button>
       )}
       <ErrorText>{error}</ErrorText>

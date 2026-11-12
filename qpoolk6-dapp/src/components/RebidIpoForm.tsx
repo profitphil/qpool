@@ -43,10 +43,10 @@ export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onCh
           <TextInput value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="numeric" className="w-24" />
         </Field>
         <Button disabled={rebid.busy || !price || !quantity} onClick={() => void submitRebid()}>
-          {rebid.busy ? '...' : 'RebidIpo'}
+          {rebid.busy ? '...' : 'Update bid'}
         </Button>
         <Button disabled={settle.busy} onClick={() => void submitSettle()}>
-          {settle.busy ? '...' : 'SettleIpo'}
+          {settle.busy ? '...' : 'Settle now'}
         </Button>
       </div>
       <ErrorText>{rebid.error}</ErrorText>

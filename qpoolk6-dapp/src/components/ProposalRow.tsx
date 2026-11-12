@@ -3,7 +3,7 @@ import type { Proposal } from '../qubic/decode'
 import { useWallet } from '../context/WalletContext'
 import { submitProcedureCall } from '../qubic/transaction'
 import { payVote, payTally, payExecute } from '../qubic/encode'
-import { QPOOLK6, P_VOTE, P_TALLY, P_EXECUTE, PROP_STATUS } from '../qubic/config'
+import { QPOOLK6, P_VOTE, P_TALLY, P_EXECUTE, PROP_STATUS, KIND_NAMES, KIND_ALLOCATE, KIND_BUY_IPO, KIND_BUY_QSWAP, KIND_SELL_QSWAP } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Button, ErrorText, KV, SuccessText } from './ui'
 
@@ -21,17 +21,23 @@ export function ProposalRow({ id, proposal, onChanged }: { id: number; proposal:
   }
 
   const statusName = PROP_STATUS[Number(proposal.status)] ?? `UNKNOWN(${proposal.status})`
+  const kindName = KIND_NAMES[Number(proposal.kind)] ?? `kind ${proposal.kind}`
+  const kindNum = Number(proposal.kind)
+  const showAsset = kindNum === KIND_BUY_QSWAP || kindNum === KIND_SELL_QSWAP // others: no token/contract-shares, or IPO's name isn't known yet
+  const showShares = kindNum !== KIND_ALLOCATE && kindNum !== KIND_BUY_IPO
+  const showPrice = kindNum !== KIND_BUY_QSWAP && kindNum !== KIND_SELL_QSWAP && kindNum !== KIND_ALLOCATE
 
   return (
     <div className="border border-border rounded p-2 space-y-1">
-      <div className="text-xs font-semibold">Proposal #{id} -- {statusName}</div>
-      <KV k="kind" v={proposal.kind.toString()} />
+      <div className="text-xs font-semibold">
+        Proposal #{id} -- {kindName} -- {statusName}
+      </div>
       <KV k="proposer" v={proposal.proposer} />
-      <KV k="asset/issuer" v={`${proposal.assetNameStr || '(none)'} / ${proposal.issuer}`} />
-      <KV k="quAmount" v={proposal.quAmount.toString()} />
-      <KV k="shares" v={proposal.shares.toString()} />
-      <KV k="price" v={proposal.price.toString()} />
-      <KV k="yes/no/eligible" v={`${proposal.yesWeight} / ${proposal.noWeight} / ${proposal.eligibleWeight}`} />
+      {showAsset && <KV k="token" v={`${proposal.assetNameStr || '(none)'} / ${proposal.issuer}`} />}
+      <KV k="budget / minimum proceeds" v={proposal.quAmount.toString()} />
+      {showShares && <KV k="shares" v={proposal.shares.toString()} />}
+      {showPrice && <KV k="price" v={proposal.price.toString()} />}
+      <KV k="yes / no / eligible votes" v={`${proposal.yesWeight} / ${proposal.noWeight} / ${proposal.eligibleWeight}`} />
       <KV k="openTick" v={proposal.openTick.toString()} />
       {wallet && (
         <div className="flex gap-2 items-center flex-wrap pt-1">

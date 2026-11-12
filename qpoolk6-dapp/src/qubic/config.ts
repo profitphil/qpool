@@ -73,6 +73,17 @@ export const KIND_SELL_QX = 5
 export const KIND_ALLOCATE = 6
 export const KIND_SELL_QX_LIMIT = 7
 export const PROP_STATUS = ['OPEN', 'PASSED', 'REJECTED', 'EXECUTED', 'EXPIRED', 'FAILED'] as const
+// Index 0 unused (proposal kinds are 1-7); plain-language names for display.
+export const KIND_NAMES = [
+  '',
+  'Buy a token (QSWAP)',
+  'Buy a token or shares (QX)',
+  'Bid in an IPO',
+  'Sell a holding (QSWAP)',
+  'Sell a holding now (QX)',
+  'Allocate funds to a holding',
+  'List a holding for sale (QX)',
+] as const
 
 // ---- return codes ----
 export const ERR_NAMES: Record<number, string> = {

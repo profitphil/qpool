@@ -41,13 +41,13 @@ export function MyPositionPanel({ holdingId, onChanged }: { holdingId: number; o
       <ErrorText>{check.error}</ErrorText>
       {position && position.found === 1 && (
         <div className="space-y-0.5">
-          <KV k="my cost" v={position.cost.toString()} />
-          <KV k="offeredCostUnits" v={position.offeredCostUnits.toString()} />
-          <KV k="askPrice" v={position.askPrice.toString()} />
-          <KV k="voteLockUntilTick" v={position.voteLockUntilTick.toString()} />
+          <KV k="my stake" v={position.cost.toString()} />
+          <KV k="currently listed for sale" v={position.offeredCostUnits.toString()} />
+          <KV k="asking price" v={position.askPrice.toString()} />
+          <KV k="vote-locked until tick" v={position.voteLockUntilTick.toString()} />
           {position.offeredCostUnits > 0n && (
             <Button disabled={cancel.busy} onClick={() => void doCancel()}>
-              {cancel.busy ? '...' : 'CancelOffer'}
+              {cancel.busy ? '...' : 'Cancel listing'}
             </Button>
           )}
         </div>

@@ -45,7 +45,7 @@ export function DepositHoldingAssetForm({ poolId, onChanged }: { poolId: number;
         <TextInput value={seatUnits} onChange={(e) => setSeatUnits(e.target.value)} inputMode="numeric" placeholder="(same as amount)" />
       </Field>
       <Button disabled={busy || !issuerId || !assetName || !amount} onClick={() => void submit()}>
-        {busy ? 'submitting...' : 'DepositHoldingAsset'}
+        {busy ? 'submitting...' : 'Deposit token'}
       </Button>
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>

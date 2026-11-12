@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { getPool, type Pool } from '../qubic/decode'
 import { scanHoldingsForPool, scanProposalsForPool } from '../qubic/scan'
 import type { Holding, Proposal } from '../qubic/decode'
-import { Button, Card, ErrorText, KV } from './ui'
+import { Badge, Button, Card, ErrorText, KV } from './ui'
 import { ContributeForm } from './ContributeForm'
 import { DepositHoldingAssetForm } from './DepositHoldingAssetForm'
 import { ProposeForm } from './ProposeForm'
@@ -54,27 +54,29 @@ export function PoolDetail({ poolId }: { poolId: number }) {
   return (
     <div className="space-y-4">
       <Card title={`Pool #${poolId}: ${pool.poolNameStr}`}>
-        <Button onClick={() => void loadPool()}>refresh</Button>
+        <div className="flex items-center justify-between">
+          <Button onClick={() => void loadPool()}>refresh</Button>
+          <Badge color={pool.permissioned ? '#f97066' : '#47cd89'}>{pool.permissioned ? 'Private' : 'Open to anyone'}</Badge>
+        </div>
         <KV k="creator" v={pool.creator} />
-        <KV k="uncommittedTotal" v={pool.uncommittedTotal.toString()} />
-        <KV k="committedTotal" v={pool.committedTotal.toString()} />
-        <KV k="contributorCount" v={pool.contributorCount.toString()} />
-        <KV k="holdingCount" v={pool.holdingCount.toString()} />
-        <KV k="permissioned" v={pool.permissioned.toString()} />
-        <KV k="depositCount" v={pool.depositCount.toString()} />
+        <KV k="members" v={pool.contributorCount.toString()} />
+        <KV k="available funds (not yet allocated)" v={`${pool.uncommittedTotal.toLocaleString()} QU`} />
+        <KV k="allocated funds" v={`${pool.committedTotal.toLocaleString()} QU`} />
+        <KV k="holdings" v={pool.holdingCount.toString()} />
+        <KV k="token deposits" v={pool.depositCount.toString()} />
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <Card title="Contribute">
+      <Card title="Join / contribute">
         <ContributeForm poolId={poolId} onChanged={loadPool} />
       </Card>
 
-      <Card title="Deposit a token holding">
+      <Card title="Deposit a token">
         <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
       </Card>
 
-      <Card title="Propose (governance)">
-        <ProposeForm poolId={poolId} onChanged={loadExtras} />
+      <Card title="Propose a pool action">
+        <ProposeForm poolId={poolId} holdings={holdings} onChanged={loadExtras} />
       </Card>
 
       <SeatMarket poolId={poolId} />
