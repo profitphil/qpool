@@ -151,3 +151,17 @@ export function payQxAddToBidOrder(issuerId: string, assetName: bigint, price: b
 export function payQxTransferMgmtRights(issuerId: string, assetName: bigint, shares: bigint | number, newMgrIndex: number): Uint8Array {
   return concatBytes(identityToBytes(issuerId), u64(assetName), i64(shares), u32(newMgrIndex))
 }
+// Same 4-field (issuer, assetName, price, numberOfShares) layout as Add* -- confirmed
+// against Qx.h's RemoveFromAskOrder_input/RemoveFromBidOrder_input directly.
+export function payQxRemoveFromAskOrder(issuerId: string, assetName: bigint, price: bigint | number, shares: bigint | number): Uint8Array {
+  return concatBytes(identityToBytes(issuerId), u64(assetName), i64(price), i64(shares))
+}
+export function payQxRemoveFromBidOrder(issuerId: string, assetName: bigint, price: bigint | number, shares: bigint | number): Uint8Array {
+  return concatBytes(identityToBytes(issuerId), u64(assetName), i64(price), i64(shares))
+}
+export function payQxAssetOrders(issuerId: string, assetName: bigint, offset: bigint | number = 0): Uint8Array {
+  return concatBytes(identityToBytes(issuerId), u64(assetName), u64(offset))
+}
+export function payQxEntityOrders(entityId: string, offset: bigint | number = 0): Uint8Array {
+  return concatBytes(identityToBytes(entityId), u64(offset))
+}

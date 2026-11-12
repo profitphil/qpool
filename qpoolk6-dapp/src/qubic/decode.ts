@@ -2,15 +2,17 @@
 // byte-for-byte. Identity fields decode async (checksum derivation), so
 // every decoder here is async too.
 import { querySmartContract } from './rpc'
-import { ru32, ru64, rid, u64ToName } from './codec'
+import { ru32, ru64, ri64, rid, u64ToName } from './codec'
 import {
   QPOOLK6, F_GET_POOL, F_GET_MEMBER, F_GET_HOLDING, F_GET_POSITION, F_GET_PROPOSAL,
   F_GET_STATS, F_GET_SOURCE, F_GET_IPO_TARGET, F_GET_IPO_BIDS, F_GET_POOL_OFFERS,
-  MAX_OFFERS_PER_POOL,
+  MAX_OFFERS_PER_POOL, QX, QX_F_ASSET_ASK_ORDERS, QX_F_ASSET_BID_ORDERS,
+  QX_F_ENTITY_ASK_ORDERS, QX_F_ENTITY_BID_ORDERS,
 } from './config'
 import {
   payGetPool, payGetMember, payGetHolding, payGetPosition, payGetProposal,
   payGetSource, payGetIpoTarget, payGetIpoBids, payGetPoolOffers,
+  payQxAssetOrders, payQxEntityOrders,
 } from './encode'
 
 export interface Pool {
@@ -269,6 +271,60 @@ export async function getPoolOffers(poolId: number): Promise<PoolOffer[]> {
     })
   }
   return out
+}
+
+// ---- QX order book ----
+// Both output shapes are a bare Array<Order,256> -- no count prefix, unlike
+// QPoolK6's own GetPoolOffers. AddToAskOrder/AddToBidOrder both require
+// price>0, so an all-zero price marks an unused slot -- stop there.
+export interface AssetOrder {
+  entity: string
+  price: bigint
+  numberOfShares: bigint
+}
+async function readAssetOrders(raw: Uint8Array): Promise<AssetOrder[]> {
+  const out: AssetOrder[] = []
+  for (let i = 0; i < 256; i++) {
+    const base = i * 48
+    const price = ri64(raw, base + 32)
+    if (price === 0n) break
+    out.push({ entity: await rid(raw, base), price, numberOfShares: ri64(raw, base + 40) })
+  }
+  return out
+}
+export async function getAssetAskOrders(issuerId: string, assetName: bigint): Promise<AssetOrder[]> {
+  return readAssetOrders(await querySmartContract(QX, QX_F_ASSET_ASK_ORDERS, payQxAssetOrders(issuerId, assetName)))
+}
+export async function getAssetBidOrders(issuerId: string, assetName: bigint): Promise<AssetOrder[]> {
+  return readAssetOrders(await querySmartContract(QX, QX_F_ASSET_BID_ORDERS, payQxAssetOrders(issuerId, assetName)))
+}
+
+export interface EntityOrder {
+  issuer: string
+  assetName: bigint
+  assetNameStr: string
+  price: bigint
+  numberOfShares: bigint
+}
+async function readEntityOrders(raw: Uint8Array): Promise<EntityOrder[]> {
+  const out: EntityOrder[] = []
+  for (let i = 0; i < 256; i++) {
+    const base = i * 56
+    const price = ri64(raw, base + 40)
+    if (price === 0n) break
+    const assetName = ru64(raw, base + 32)
+    out.push({
+      issuer: await rid(raw, base), assetName, assetNameStr: u64ToName(assetName),
+      price, numberOfShares: ri64(raw, base + 48),
+    })
+  }
+  return out
+}
+export async function getEntityAskOrders(entityId: string): Promise<EntityOrder[]> {
+  return readEntityOrders(await querySmartContract(QX, QX_F_ENTITY_ASK_ORDERS, payQxEntityOrders(entityId)))
+}
+export async function getEntityBidOrders(entityId: string): Promise<EntityOrder[]> {
+  return readEntityOrders(await querySmartContract(QX, QX_F_ENTITY_BID_ORDERS, payQxEntityOrders(entityId)))
 }
 
 // Propose's slot is picked by a free/expired-slot scan, not creation order --

@@ -15,6 +15,27 @@ export const CONTRACT_NAMES: Record<number, string> = {
   [K6TGT]: 'K6TGT', [K6TGT2]: 'K6TGT2', [QX]: 'QX', [QSWAP]: 'QSWAP',
 }
 
+// Every IPO-target stub registered in core-lite's contract_def.h that
+// QPoolK6 (index 49) can actually bid on -- BUY_IPO refuses any target
+// index <= QPoolK6's own, so this list only has index > 49. Mirrors
+// contract_def.h exactly (verified by counting its array positions); keep
+// in sync by hand if that file changes. IPO window for a target is always
+// constructionEpoch - 1.
+export interface IpoTarget {
+  name: string
+  index: number
+  constructionEpoch: number
+}
+export const IPO_TARGETS: IpoTarget[] = [
+  { name: 'K6TGT', index: 50, constructionEpoch: 226 },
+  { name: 'K6TGT2', index: 51, constructionEpoch: 226 },
+  ...Array.from({ length: 23 }, (_, i) => ({
+    name: `K6W${i + 1}`,
+    index: 52 + i,
+    constructionEpoch: 233 + i,
+  })),
+]
+
 // ---- procedures ----
 export const P_CREATE_POOL = 1
 export const P_CONTRIBUTE = 2
@@ -63,6 +84,10 @@ export const QX_P_ADD_TO_BID_ORDER = 6
 export const QX_P_REMOVE_FROM_ASK_ORDER = 7
 export const QX_P_REMOVE_FROM_BID_ORDER = 8
 export const QX_P_TRANSFER_SHARE_MGMT_RIGHTS = 9
+export const QX_F_ASSET_ASK_ORDERS = 2
+export const QX_F_ASSET_BID_ORDERS = 3
+export const QX_F_ENTITY_ASK_ORDERS = 4
+export const QX_F_ENTITY_BID_ORDERS = 5
 
 // ---- proposal kinds / status ----
 export const KIND_BUY_QSWAP = 1

@@ -7,9 +7,10 @@ import { StatsPanel } from './components/StatsPanel'
 import { RegisterDividendPayerForm } from './components/RegisterDividendPayerForm'
 import { ReleaseManagedSharesForm } from './components/ReleaseManagedSharesForm'
 import { WalletLookup } from './components/WalletLookup'
+import { QxMarket } from './components/QxMarket'
 import { Button } from './components/ui'
 
-const TABS = ['Pools', 'Tools', 'Stats'] as const
+const TABS = ['Pools', 'Market', 'Tools', 'Stats'] as const
 type Tab = (typeof TABS)[number]
 
 export default function App() {
@@ -37,6 +38,7 @@ export default function App() {
         </nav>
         <main className="p-4">
           {tab === 'Pools' && <PoolsTab />}
+          {tab === 'Market' && <QxMarket />}
           {tab === 'Tools' && (
             <div className="space-y-4">
               <WalletLookup />
