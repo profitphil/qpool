@@ -31,11 +31,12 @@ async function rpcFetch(path: string, init?: RequestInit, attempt = 0): Promise<
 export interface TickInfo {
   tick: number
   epoch: number
+  epochStartTick: number
 }
 
 export async function getTick(): Promise<TickInfo> {
   const json = await rpcFetch('/query/v1/getLastProcessedTick')
-  return { tick: json.tickNumber, epoch: json.epoch }
+  return { tick: json.tickNumber, epoch: json.epoch, epochStartTick: json.intervalInitialTick }
 }
 
 export async function getBalance(identity: string): Promise<bigint> {

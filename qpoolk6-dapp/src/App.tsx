@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { WalletProvider } from './context/WalletContext'
+import { EpochBanner } from './components/EpochBanner'
 import { WalletPanel } from './components/WalletPanel'
 import { PoolsTab } from './components/PoolsTab'
 import { StatsPanel } from './components/StatsPanel'
@@ -16,12 +17,15 @@ export default function App() {
   return (
     <WalletProvider>
       <div className="min-h-screen max-w-5xl mx-auto">
-        <header className="sticky top-0 z-50 bg-background border-b border-border p-4">
-          <h1 className="text-lg font-bold">QPoolK6 testnet explorer</h1>
-          <p className="text-xs text-muted-foreground">
-            A live devnet running QPoolK6 -- browse real pools and submit real signed transactions against it.
-          </p>
-        </header>
+        <div className="sticky top-0 z-50">
+          <EpochBanner />
+          <header className="bg-background border-b border-border p-4">
+            <h1 className="text-lg font-bold">QPoolK6 testnet explorer</h1>
+            <p className="text-xs text-muted-foreground">
+              A live devnet running QPoolK6 -- browse real pools and submit real signed transactions against it.
+            </p>
+          </header>
+        </div>
         <WalletPanel />
         <nav className="flex gap-1 p-3 border-b border-border">
           {TABS.map((t) => (

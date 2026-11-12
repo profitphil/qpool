@@ -101,6 +101,12 @@ export const MIN_CONTRIBUTION = 10_000
 export const MANAGEMENT_PERMILLE = 10
 export const MAX_OFFERS_PER_POOL = 128
 
+// Empirically measured on this devkit's accelerated test chain (2 full
+// epochs spanned 2,802 ticks) -- an estimate for display only, the real
+// pace drifts a bit tick to tick.
+export const EPOCH_TICKS_ESTIMATE = 1400
+export const TICKS_PER_SECOND_ESTIMATE = 2
+
 export const TICKS_PER_HOUR = 2
 export const VOTE_WINDOW = 72 * TICKS_PER_HOUR
 export const EXECUTE_WINDOW = 48 * TICKS_PER_HOUR
