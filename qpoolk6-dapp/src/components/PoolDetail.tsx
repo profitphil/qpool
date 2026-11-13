@@ -48,6 +48,14 @@ export function PoolDetail({ poolId }: { poolId: number }) {
   useEffect(() => {
     void loadPool()
     void loadExtras()
+    // A pool's first load fires ~260 requests at once (holdings + proposals
+    // scan); on the shared free Cloudflare tunnel that occasionally drops or
+    // times out a handful even with rpc.ts's own 429 backoff, undercounting
+    // a just-submitted proposal with no visible error. One silent re-scan
+    // after the initial burst has settled catches that without the user
+    // needing to notice and click rescan themselves.
+    const retry = setTimeout(() => void loadExtras(), 2500)
+    return () => clearTimeout(retry)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolId])
 
@@ -108,6 +116,11 @@ export function PoolDetail({ poolId }: { poolId: number }) {
       </Card>
 
       <Card title={`Proposals (${proposals.length} found, scanned)`} icon={<IconList />} iconTone="neutral">
+        <div className="text-xs text-muted-foreground">
+          A busy shared tunnel can occasionally undercount on the very first load -- if you just submitted a
+          proposal and don't see it below, rescan before assuming it failed.
+        </div>
+        <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
         <div className="grid sm:grid-cols-2 gap-2">
           {proposals.map(({ id, proposal }) => (
             <ProposalRow key={id} id={id} proposal={proposal} onChanged={loadExtras} />
