@@ -6,6 +6,7 @@ import { nameToU64 } from '../qubic/codec'
 import { QPOOLK6, P_RELEASE_MANAGED_SHARES } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Button, Card, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { IconUnlock } from './icons'
 
 export function ReleaseManagedSharesForm() {
   const { wallet } = useWallet()
@@ -15,7 +16,7 @@ export function ReleaseManagedSharesForm() {
   const [destIndex, setDestIndex] = useState('1')
   const { busy, error, result, run } = useAction<string>()
 
-  if (!wallet) return <Card title="Release managed shares">Connect a wallet to use this.</Card>
+  if (!wallet) return <Card title="Release managed shares" icon={<IconUnlock />}>Connect a wallet to use this.</Card>
 
   async function submit() {
     await run(async () => {
@@ -26,7 +27,7 @@ export function ReleaseManagedSharesForm() {
   }
 
   return (
-    <Card title="Release managed shares">
+    <Card title="Release managed shares" icon={<IconUnlock />}>
       <div className="text-xs text-muted-foreground">
         Reclaims shares you own that QPoolK6 manages but that never ended up in a pool holding (e.g. a deposit that
         got refused after the share transfer already happened). Attach the destination contract's own transfer fee
@@ -44,8 +45,8 @@ export function ReleaseManagedSharesForm() {
       <Field label="Destination contract index (e.g. 1 = QX)">
         <TextInput value={destIndex} onChange={(e) => setDestIndex(e.target.value)} inputMode="numeric" />
       </Field>
-      <Button disabled={busy || !issuerId || !assetName || !amount} onClick={() => void submit()}>
-        {busy ? 'submitting...' : 'Release shares'}
+      <Button loading={busy} disabled={!issuerId || !assetName || !amount} onClick={() => void submit()}>
+        Release shares
       </Button>
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>

@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { getStats, type Stats } from '../qubic/decode'
-import { Button, Card, ErrorText, KV } from './ui'
+import { Button, Card, ErrorText, Stat } from './ui'
+import { IconChart } from './icons'
+
+function labelize(key: string): string {
+  return key.replace(/([a-z])([A-Z])/g, '$1 $2').replace(/^./, (c) => c.toUpperCase())
+}
 
 export function StatsPanel() {
   const [stats, setStats] = useState<Stats | null>(null)
@@ -24,15 +29,18 @@ export function StatsPanel() {
   }, [])
 
   return (
-    <Card title="Contract stats">
-      <Button disabled={busy} onClick={() => void load()}>
-        {busy ? 'loading...' : 'refresh'}
-      </Button>
+    <Card
+      title="Contract stats"
+      icon={<IconChart />}
+      right={<Button size="sm" loading={busy} onClick={() => void load()}>refresh</Button>}
+    >
       <ErrorText>{error}</ErrorText>
       {stats && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
           {Object.entries(stats).map(([k, v]) => (
-            <KV key={k} k={k} v={v.toLocaleString()} />
+            <div key={k} className="border border-border rounded-xl p-3 bg-muted/30">
+              <Stat label={labelize(k)} value={v.toLocaleString()} />
+            </div>
           ))}
         </div>
       )}

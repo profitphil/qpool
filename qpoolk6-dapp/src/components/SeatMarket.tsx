@@ -6,6 +6,7 @@ import { getPoolOffers, getHolding, type PoolOffer, type Holding } from '../qubi
 import { QPOOLK6, P_BUY_POSITION, JOIN_FEE } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Avatar, Button, Card, ErrorText, Identity, KV, Skeleton, Stat, SuccessText } from './ui'
+import { IconSeat } from './icons'
 
 export function BuyRow({ offer, onChanged }: { offer: PoolOffer; onChanged?: () => void }) {
   const { wallet, refreshBalance } = useWallet()
@@ -104,7 +105,7 @@ export function SeatMarket({ poolId }: { poolId: number }) {
   }, [poolId])
 
   return (
-    <Card title={`Seat market (${offers.length} open offers)`}>
+    <Card title={`Seat market (${offers.length} open offers)`} icon={<IconSeat />} iconTone="success">
       <div className="text-xs text-muted-foreground">
         Open offers against this pool's holdings, from OfferPosition. Buying one calls BuyPosition with exactly
         this row's numbers -- if someone else bought it or the seller changed it first, the purchase is refused

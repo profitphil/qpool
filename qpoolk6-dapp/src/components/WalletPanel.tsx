@@ -21,9 +21,9 @@ export function WalletPanel() {
 
   if (wallet) {
     return (
-      <div className="bg-gradient-to-b from-card to-card/60 border-b border-border p-3 space-y-2.5 text-sm">
+      <div className="bg-card border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] p-4 space-y-2.5 text-sm">
         <div className="flex items-center gap-3 flex-wrap">
-          <Avatar seed={wallet.identity} size={30} />
+          <Avatar seed={wallet.identity} size={34} />
           <div className="min-w-0">
             <Identity id={wallet.identity} />
             <div className="font-mono text-base font-semibold tabular-nums">
@@ -41,7 +41,7 @@ export function WalletPanel() {
   }
 
   return (
-    <div className="border-b border-border bg-muted/40 px-4 py-8 flex justify-center">
+    <div className="flex justify-center py-6">
       <div className="w-full max-w-[448px] bg-card border border-border rounded-[22px] shadow-[0_24px_70px_-20px_rgba(15,23,42,0.18)] p-8 space-y-4">
         <div className="space-y-1">
           <div className="text-[10.5px] font-bold uppercase tracking-wider text-accent-foreground">Connect wallet</div>

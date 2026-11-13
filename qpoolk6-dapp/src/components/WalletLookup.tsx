@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { getBalance } from '../qubic/rpc'
 import { AssetList } from './AssetList'
 import { Button, Card, ErrorText, Field, TextInput } from './ui'
+import { IconSearch } from './icons'
 
 // Checking a wallet other than your own -- a demo wallet before switching to
 // it, a seat-market seller, anyone. Doesn't need a connected wallet.
@@ -26,13 +27,13 @@ export function WalletLookup() {
   }
 
   return (
-    <Card title="Look up a wallet">
+    <Card title="Look up a wallet" icon={<IconSearch />}>
       <div className="text-xs text-muted-foreground">Check any identity's QU balance and token holdings -- not just your own connected wallet.</div>
       <Field label="Identity">
         <TextInput value={identity} onChange={(e) => setIdentity(e.target.value)} placeholder="60-char identity" />
       </Field>
-      <Button disabled={busy || !identity} onClick={() => void check()}>
-        {busy ? 'checking...' : 'Check'}
+      <Button loading={busy} disabled={!identity} onClick={() => void check()}>
+        Check
       </Button>
       <ErrorText>{error}</ErrorText>
       {checked && (

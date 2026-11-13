@@ -10,50 +10,7 @@ import { activeIpoTargets } from './EpochBanner'
 import { BuyRow } from './SeatMarket'
 import { useAction } from '../hooks/useAction'
 import { Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Identity, Skeleton, Stat, SuccessText, TextInput } from './ui'
-
-function IconTicket() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M2 9a3 3 0 0 1 0 6v3a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-3a3 3 0 0 1 0-6V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z" />
-      <path d="M13 5v2M13 17v2M13 10v4" />
-    </svg>
-  )
-}
-function IconBook() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z" />
-      <path d="M4 19.5V5.5M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-3" />
-    </svg>
-  )
-}
-function IconSeat() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
-      <path d="M3 11h18v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <path d="M5 17v3M19 17v3" />
-    </svg>
-  )
-}
-function IconCoins() {
-  return (
-    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <ellipse cx="9" cy="6" rx="6" ry="3" />
-      <path d="M3 6v6c0 1.66 2.69 3 6 3s6-1.34 6-3V6" />
-      <path d="M3 12v6c0 1.66 2.69 3 6 3 2.08 0 3.9-.56 5-1.42" />
-      <path d="M15 8.07c2.98.38 5 1.59 5 2.93 0 1.66-2.69 3-6 3-.34 0-.68-.01-1-.04M15 15c2.76 0 5-1.34 5-3v6c0 1.66-2.24 3-5 3s-5-1.34-5-3v-2" />
-    </svg>
-  )
-}
-function IconSearch() {
-  return (
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-      <circle cx="11" cy="11" r="7" />
-      <path d="m20 20-3.2-3.2" />
-    </svg>
-  )
-}
+import { IconBook, IconCoins, IconSearch, IconSeat, IconTicket } from './icons'
 
 function QuickBidRow({ listing, onChanged }: { listing: AssetListing; onChanged?: () => void }) {
   const { wallet } = useWallet()
@@ -204,7 +161,7 @@ export function Marketplace() {
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <Card title={`IPO open for bidding (${active.length})`} icon={<IconTicket />}>
+      <Card title={`IPO open for bidding (${active.length})`} icon={<IconTicket />} iconTone="warning">
         {!loadedOnce ? (
           <Skeleton className="h-10" />
         ) : active.length === 0 ? (
@@ -230,7 +187,7 @@ export function Marketplace() {
         )}
       </Card>
 
-      <Card title={`QX order book -- resting asks (${listings.length})`} icon={<IconBook />}>
+      <Card title={`QX order book -- resting asks (${listings.length})`} icon={<IconBook />} iconTone="info">
         {!loadedOnce ? (
           <div className="grid sm:grid-cols-2 gap-2">
             <Skeleton className="h-28" />
@@ -247,7 +204,7 @@ export function Marketplace() {
         )}
       </Card>
 
-      <Card title={`Pool seats for sale (${offers.length})`} icon={<IconSeat />}>
+      <Card title={`Pool seats for sale (${offers.length})`} icon={<IconSeat />} iconTone="success">
         {!loadedOnce ? (
           <Skeleton className="h-20" />
         ) : offers.length === 0 ? (
@@ -266,7 +223,7 @@ export function Marketplace() {
         )}
       </Card>
 
-      <Card title={`Known tokens on this testnet (${filteredKnown.length})`} icon={<IconCoins />}>
+      <Card title={`Known tokens on this testnet (${filteredKnown.length})`} icon={<IconCoins />} iconTone="neutral">
         <div className="text-xs text-muted-foreground">
           Every token any of this devkit's known demo/test wallets currently hold, regardless of whether it's in a
           pool or listed anywhere -- this is the full catalog, not just active listings.

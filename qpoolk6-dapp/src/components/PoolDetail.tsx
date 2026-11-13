@@ -10,6 +10,7 @@ import { ProposeForm } from './ProposeForm'
 import { HoldingRow } from './HoldingRow'
 import { ProposalRow } from './ProposalRow'
 import { SeatMarket } from './SeatMarket'
+import { IconLayers, IconList, IconPool, IconUpload, IconVote, IconWallet } from './icons'
 
 export function PoolDetail({ poolId }: { poolId: number }) {
   const { wallet } = useWallet()
@@ -57,40 +58,48 @@ export function PoolDetail({ poolId }: { poolId: number }) {
 
   return (
     <div className="space-y-4">
-      <Card title={`Pool #${poolId}: ${pool.poolNameStr}`}>
+      <Card title={`Pool #${poolId}: ${pool.poolNameStr}`} icon={<IconPool />} iconTone="info">
         <div className="flex items-center justify-between">
           <Button onClick={() => void loadPool()}>refresh</Button>
           <Badge tone={pool.permissioned ? 'danger' : 'success'}>{pool.permissioned ? 'Private' : 'Open to anyone'}</Badge>
         </div>
-        <KV k="creator" v={<Identity id={pool.creator} />} />
-        <KV k="members" v={pool.contributorCount.toString()} />
-        <KV k="available funds (not yet allocated)" v={`${pool.uncommittedTotal.toLocaleString()} QU`} />
-        <KV k="allocated funds" v={`${pool.committedTotal.toLocaleString()} QU`} />
-        <KV k="holdings" v={pool.holdingCount.toString()} />
-        <KV k="token deposits" v={pool.depositCount.toString()} />
+        <div className="grid sm:grid-cols-2 gap-x-6">
+          <KV k="creator" v={<Identity id={pool.creator} />} />
+          <KV k="members" v={pool.contributorCount.toString()} />
+          <KV k="available funds (not yet allocated)" v={`${pool.uncommittedTotal.toLocaleString()} QU`} />
+          <KV k="allocated funds" v={`${pool.committedTotal.toLocaleString()} QU`} />
+          <KV k="holdings" v={pool.holdingCount.toString()} />
+          <KV k="token deposits" v={pool.depositCount.toString()} />
+        </div>
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <Card title="Join / contribute">
-        <ContributeForm poolId={poolId} onChanged={loadPool} />
-      </Card>
-
-      {isCreator && (
-        <Card title="Deposit a token" right={<Badge tone="info">creator only -- only you can see this</Badge>}>
-          <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
+      <div className="grid md:grid-cols-2 gap-4 items-start">
+        <Card title="Join / contribute" icon={<IconWallet />} iconTone="success">
+          <ContributeForm poolId={poolId} onChanged={loadPool} />
         </Card>
-      )}
 
-      <Card title="Propose a pool action">
-        <ProposeForm poolId={poolId} holdings={holdings} onChanged={loadExtras} />
-      </Card>
+        <Card title="Propose a pool action" icon={<IconVote />} iconTone="warning">
+          <ProposeForm poolId={poolId} holdings={holdings} onChanged={loadExtras} />
+        </Card>
+
+        {isCreator && (
+          <Card
+            title="Deposit a token"
+            icon={<IconUpload />}
+            iconTone="info"
+            right={<Badge tone="info">creator only</Badge>}
+            interactive
+          >
+            <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
+          </Card>
+        )}
+      </div>
 
       <SeatMarket poolId={poolId} />
 
-      <Card title={`Holdings (${holdings.length} found, scanned)`}>
-        <Button disabled={loadingExtras} onClick={() => void loadExtras()}>
-          {loadingExtras ? 'scanning...' : 'rescan'}
-        </Button>
+      <Card title={`Holdings (${holdings.length} found, scanned)`} icon={<IconLayers />} iconTone="neutral">
+        <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
         <div className="grid sm:grid-cols-2 gap-2">
           {holdings.map(({ id, holding }) => (
             <HoldingRow key={id} id={id} holding={holding} onChanged={loadExtras} />
@@ -98,7 +107,7 @@ export function PoolDetail({ poolId }: { poolId: number }) {
         </div>
       </Card>
 
-      <Card title={`Proposals (${proposals.length} found, scanned)`}>
+      <Card title={`Proposals (${proposals.length} found, scanned)`} icon={<IconList />} iconTone="neutral">
         <div className="grid sm:grid-cols-2 gap-2">
           {proposals.map(({ id, proposal }) => (
             <ProposalRow key={id} id={id} proposal={proposal} onChanged={loadExtras} />

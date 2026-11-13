@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useWallet } from '../context/WalletContext'
 import { submitProcedureCall } from '../qubic/transaction'
 import { nameToU64 } from '../qubic/codec'
@@ -9,11 +9,14 @@ import {
   getAssetAskOrders, getAssetBidOrders, getEntityAskOrders, getEntityBidOrders,
   type AssetOrder, type EntityOrder,
 } from '../qubic/decode'
+import { scanKnownAssetCatalog, type KnownAsset } from '../qubic/knownAssets'
 import { QX, QX_P_ADD_TO_ASK_ORDER, QX_P_ADD_TO_BID_ORDER, QX_P_REMOVE_FROM_ASK_ORDER, QX_P_REMOVE_FROM_BID_ORDER } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Button, Card, ErrorText, Field, KV, Select, SuccessText, TextInput } from './ui'
+import { AssetPicker } from './AssetPicker'
+import { IconBook, IconList, IconPlus } from './icons'
 
-function PlaceOrderForm() {
+function PlaceOrderForm({ knownAssets }: { knownAssets: KnownAsset[] }) {
   const { wallet } = useWallet()
   const [side, setSide] = useState<'ask' | 'bid'>('ask')
   const [issuerId, setIssuerId] = useState('')
@@ -47,6 +50,9 @@ function PlaceOrderForm() {
           <option value="bid">Bid (buy -- attaches price &times; shares as payment)</option>
         </Select>
       </Field>
+      <Field label="Find a token" hint="Or type the issuer and symbol by hand below.">
+        <AssetPicker assets={knownAssets} onSelect={(issuer, symbol) => { setIssuerId(issuer); setAssetName(symbol) }} />
+      </Field>
       <Field label="Token's issuer (identity)">
         <TextInput value={issuerId} onChange={(e) => setIssuerId(e.target.value)} placeholder="60-char identity" />
       </Field>
@@ -59,8 +65,8 @@ function PlaceOrderForm() {
       <Field label="Shares">
         <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
       </Field>
-      <Button variant="primary" disabled={busy || !issuerId || !assetName || !price || !shares} onClick={() => void submit()}>
-        {busy ? 'submitting...' : `Place ${side}`}
+      <Button variant="primary" loading={busy} disabled={!issuerId || !assetName || !price || !shares} onClick={() => void submit()}>
+        Place {side}
       </Button>
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>
@@ -98,9 +104,7 @@ function MyOrders() {
 
   return (
     <div className="space-y-2">
-      <Button disabled={check.busy} onClick={() => void load()}>
-        {check.busy ? 'checking...' : 'Check my orders'}
-      </Button>
+      <Button loading={check.busy} onClick={() => void load()}>Check my orders</Button>
       <ErrorText>{check.error}</ErrorText>
       {asks && (
         <div className="space-y-1">
@@ -110,7 +114,7 @@ function MyOrders() {
               <span>
                 {o.assetNameStr} -- {o.numberOfShares.toString()} @ {o.price.toString()}
               </span>
-              <Button disabled={cancel.busy} onClick={() => void doCancel(o, 'ask')}>
+              <Button size="sm" disabled={cancel.busy} onClick={() => void doCancel(o, 'ask')}>
                 cancel
               </Button>
             </div>
@@ -125,7 +129,7 @@ function MyOrders() {
               <span>
                 {o.assetNameStr} -- {o.numberOfShares.toString()} @ {o.price.toString()}
               </span>
-              <Button disabled={cancel.busy} onClick={() => void doCancel(o, 'bid')}>
+              <Button size="sm" disabled={cancel.busy} onClick={() => void doCancel(o, 'bid')}>
                 cancel
               </Button>
             </div>
@@ -138,7 +142,7 @@ function MyOrders() {
   )
 }
 
-function OrderBookViewer() {
+function OrderBookViewer({ knownAssets }: { knownAssets: KnownAsset[] }) {
   const [issuerId, setIssuerId] = useState('')
   const [assetName, setAssetName] = useState('')
   const [asks, setAsks] = useState<AssetOrder[] | null>(null)
@@ -155,14 +159,17 @@ function OrderBookViewer() {
 
   return (
     <div className="space-y-2">
+      <Field label="Find a token" hint="Or type the issuer and symbol by hand below.">
+        <AssetPicker assets={knownAssets} onSelect={(issuer, symbol) => { setIssuerId(issuer); setAssetName(symbol) }} />
+      </Field>
       <Field label="Token's issuer (identity)">
         <TextInput value={issuerId} onChange={(e) => setIssuerId(e.target.value)} placeholder="60-char identity" />
       </Field>
       <Field label="Token symbol (1-7 chars)">
         <TextInput value={assetName} onChange={(e) => setAssetName(e.target.value)} maxLength={7} placeholder="MYTOKEN" />
       </Field>
-      <Button disabled={busy || !issuerId || !assetName} onClick={() => void load()}>
-        {busy ? 'loading...' : 'Show order book'}
+      <Button loading={busy} disabled={!issuerId || !assetName} onClick={() => void load()}>
+        Show order book
       </Button>
       <ErrorText>{error}</ErrorText>
       {asks && bids && (
@@ -182,21 +189,27 @@ function OrderBookViewer() {
 }
 
 export function QxMarket() {
+  const [knownAssets, setKnownAssets] = useState<KnownAsset[]>([])
+
+  useEffect(() => {
+    scanKnownAssetCatalog().then(setKnownAssets).catch(() => setKnownAssets([]))
+  }, [])
+
   return (
     <div className="space-y-4">
-      <Card title="Place an order on QX">
+      <Card title="Place an order on QX" icon={<IconPlus />} iconTone="info">
         <div className="text-xs text-muted-foreground">
           QX is a real contract on this chain, separate from QPoolK6 -- any wallet can trade any token directly here,
           independent of pools. An ask needs the shares already self-held under QX's own management (not handed to
           QPoolK6 or any other contract); a bid locks the full price &times; shares as payment until filled or cancelled.
         </div>
-        <PlaceOrderForm />
+        <PlaceOrderForm knownAssets={knownAssets} />
       </Card>
-      <Card title="My orders">
+      <Card title="My orders" icon={<IconList />} iconTone="neutral">
         <MyOrders />
       </Card>
-      <Card title="Order book for a token">
-        <OrderBookViewer />
+      <Card title="Order book for a token" icon={<IconBook />} iconTone="info">
+        <OrderBookViewer knownAssets={knownAssets} />
       </Card>
     </div>
   )

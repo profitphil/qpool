@@ -5,26 +5,49 @@ function cx(...parts: Array<string | false | null | undefined>): string {
   return parts.filter(Boolean).join(' ')
 }
 
+const TONE_COLORS: Record<string, string> = {
+  info: '#3099c9',
+  success: '#16a34a',
+  warning: '#d97706',
+  danger: '#dc2626',
+  neutral: '#64748b',
+}
+
 export function Card({
-  title, icon, right, interactive = false, children,
-}: { title?: string; icon?: ReactNode; right?: ReactNode; interactive?: boolean; children: ReactNode }) {
+  title, icon, iconTone = 'info', right, interactive = false, children,
+}: {
+  title?: ReactNode
+  icon?: ReactNode
+  iconTone?: 'info' | 'success' | 'warning' | 'danger' | 'neutral'
+  right?: ReactNode
+  interactive?: boolean
+  children: ReactNode
+}) {
+  const c = TONE_COLORS[iconTone]
   return (
     <div
       className={cx(
-        'bg-card text-card-foreground border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] p-4 space-y-3',
+        'bg-card text-card-foreground border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] overflow-hidden',
         interactive && 'transition-all duration-200 hover:border-primary/40 hover:shadow-[0_2px_8px_rgba(15,23,42,0.04),0_16px_36px_-16px_rgba(48,153,201,0.22)]',
       )}
     >
       {(title || right) && (
-        <div className="flex items-center justify-between gap-2">
-          <h3 className="flex items-center gap-1.5 font-semibold text-[11px] uppercase tracking-wider text-muted-foreground">
-            {icon}
+        <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-border/70 bg-muted/30">
+          <h3 className="flex items-center gap-2 font-semibold text-[11.5px] uppercase tracking-wider text-muted-foreground">
+            {icon && (
+              <span
+                className="flex h-6 w-6 items-center justify-center rounded-lg shrink-0"
+                style={{ backgroundColor: `${c}17`, color: c }}
+              >
+                {icon}
+              </span>
+            )}
             {title}
           </h3>
           {right}
         </div>
       )}
-      {children}
+      <div className="p-4 space-y-3">{children}</div>
     </div>
   )
 }

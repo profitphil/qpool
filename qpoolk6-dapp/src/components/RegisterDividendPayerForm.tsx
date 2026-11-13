@@ -5,7 +5,8 @@ import { payRegisterDividendPayer } from '../qubic/encode'
 import { nameToU64 } from '../qubic/codec'
 import { QPOOLK6, P_REGISTER_DIVIDEND_PAYER, NULL_ID } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Button, Card, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { Button, Card, ErrorText, Field, Identity, SuccessText, TextInput } from './ui'
+import { IconGift } from './icons'
 
 export function RegisterDividendPayerForm() {
   const { wallet } = useWallet()
@@ -13,7 +14,7 @@ export function RegisterDividendPayerForm() {
   const [payerId, setPayerId] = useState('')
   const { busy, error, result, run } = useAction<string>()
 
-  if (!wallet) return <Card title="Register dividend payer">Connect a wallet (must be the token's issuer) to use this.</Card>
+  if (!wallet) return <Card title="Register dividend payer" icon={<IconGift />}>Connect a wallet (must be the token's issuer) to use this.</Card>
 
   async function submit(clear: boolean) {
     await run(async () => {
@@ -24,12 +25,12 @@ export function RegisterDividendPayerForm() {
   }
 
   return (
-    <Card title="Register dividend payer">
+    <Card title="Register dividend payer" icon={<IconGift />}>
       <div className="text-xs text-muted-foreground">
         Issuer-only: declares who the REAL dividend payer is for a token you issued, when it differs from your own
         identity (e.g. a staking contract that pays dividends on your token but isn't its registered issuer). Must
         be sent from the connected wallet, and that wallet must be this token's issuer -- your connected identity is{' '}
-        <span className="font-mono">{wallet.identity}</span>.
+        <Identity id={wallet.identity} />.
       </div>
       <Field label="Asset name (1-7 chars, issued by your connected wallet)">
         <TextInput value={assetName} onChange={(e) => setAssetName(e.target.value)} maxLength={7} placeholder="MYTOKEN" />
@@ -38,10 +39,10 @@ export function RegisterDividendPayerForm() {
         <TextInput value={payerId} onChange={(e) => setPayerId(e.target.value)} placeholder="60-char identity" />
       </Field>
       <div className="flex gap-2">
-        <Button disabled={busy || !assetName || !payerId} onClick={() => void submit(false)}>
-          {busy ? 'submitting...' : 'Register'}
+        <Button variant="primary" loading={busy} disabled={!assetName || !payerId} onClick={() => void submit(false)}>
+          Register
         </Button>
-        <Button disabled={busy || !assetName} onClick={() => void submit(true)}>
+        <Button loading={busy} disabled={!assetName} onClick={() => void submit(true)}>
           Clear (back to issuer-pays)
         </Button>
       </div>

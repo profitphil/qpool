@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { scanPools } from '../qubic/scan'
 import type { Pool } from '../qubic/decode'
-import { Badge, Button, Card, ErrorText } from './ui'
+import { Badge, Button, Card, ErrorText, Identity } from './ui'
 import { CreatePoolForm } from './CreatePoolForm'
 import { PoolDetail } from './PoolDetail'
+import { IconPool } from './icons'
 
 export function PoolsTab() {
   const [pools, setPools] = useState<{ id: number; pool: Pool }[]>([])
@@ -41,24 +42,29 @@ export function PoolsTab() {
   return (
     <div className="space-y-4">
       <CreatePoolForm onCreated={load} />
-      <Card title={`Pools (${pools.length} found in first ${scanLimit} slots)`}>
-        <div className="flex gap-2 items-center">
-          <Button disabled={busy} onClick={() => void load()}>
-            {busy ? 'scanning...' : 'rescan'}
-          </Button>
-          <Button onClick={() => setScanLimit((n) => n + 30)}>scan 30 more</Button>
-        </div>
+      <Card
+        title={`Pools (${pools.length} found in first ${scanLimit} slots)`}
+        icon={<IconPool />}
+        right={
+          <div className="flex gap-2">
+            <Button size="sm" loading={busy} onClick={() => void load()}>rescan</Button>
+            <Button size="sm" variant="ghost" onClick={() => setScanLimit((n) => n + 30)}>scan 30 more</Button>
+          </div>
+        }
+      >
         <ErrorText>{error}</ErrorText>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-3">
           {pools.map(({ id, pool }) => (
-            <button
+            <div
               key={id}
               onClick={() => setSelected(id)}
-              className="group text-left bg-card border border-border rounded-xl p-3 space-y-2 text-xs shadow-sm transition-all duration-200 hover:border-primary/50 hover:shadow-lg hover:-translate-y-0.5"
+              role="button"
+              tabIndex={0}
+              className="group text-left bg-card border border-border rounded-xl p-3 space-y-2 text-xs shadow-[0_2px_6px_rgba(15,23,42,0.04)] transition-all duration-200 hover:border-primary/50 hover:shadow-[0_12px_24px_-8px_rgba(48,153,201,0.25)] hover:-translate-y-0.5 cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-lg bg-gradient-to-r from-primary to-success text-xs font-bold text-primary-foreground">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-primary/70 text-xs font-bold text-primary-foreground">
                     #{id}
                   </div>
                   <div className="font-semibold text-sm">{pool.poolNameStr}</div>
@@ -67,14 +73,16 @@ export function PoolsTab() {
                   {pool.permissioned ? 'Private' : 'Open'}
                 </Badge>
               </div>
-              <div className="font-mono text-muted-foreground truncate">{pool.creator}</div>
-              <div className="flex justify-between text-muted-foreground pt-1 border-t border-border/60">
+              <div onClick={(e) => e.stopPropagation()}>
+                <Identity id={pool.creator} label="by" />
+              </div>
+              <div className="flex justify-between text-muted-foreground pt-1.5 border-t border-border/60">
                 <span>holdings: {pool.holdingCount.toString()}</span>
                 <span className="text-foreground font-medium transition-transform group-hover:translate-x-1">
                   committed: {pool.committedTotal.toString()} &rarr;
                 </span>
               </div>
-            </button>
+            </div>
           ))}
         </div>
       </Card>
