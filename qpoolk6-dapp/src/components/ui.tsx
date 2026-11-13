@@ -11,8 +11,8 @@ export function Card({
   return (
     <div
       className={cx(
-        'bg-card text-card-foreground border border-border rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_8px_24px_-12px_rgba(0,0,0,0.6)] p-4 space-y-3',
-        interactive && 'transition-all duration-200 hover:border-primary/40 hover:shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_12px_28px_-10px_rgba(97,240,254,0.15)]',
+        'bg-card text-card-foreground border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] p-4 space-y-3',
+        interactive && 'transition-all duration-200 hover:border-primary/40 hover:shadow-[0_2px_8px_rgba(15,23,42,0.04),0_16px_36px_-16px_rgba(48,153,201,0.22)]',
       )}
     >
       {(title || right) && (
@@ -74,13 +74,13 @@ export function Button({
   loading?: boolean
   icon?: ReactNode
 }) {
-  const base = 'inline-flex items-center justify-center gap-1.5 rounded-lg font-medium transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]'
-  const sizes = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-1.5 text-sm'
+  const base = 'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]'
+  const sizes = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-2 text-sm'
   const styles = {
-    primary: 'bg-gradient-to-b from-primary to-primary/80 text-primary-foreground shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_4px_12px_-4px_rgba(97,240,254,0.5)] hover:shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_6px_16px_-4px_rgba(97,240,254,0.65)] hover:brightness-105',
-    secondary: 'border border-border bg-input/40 text-foreground hover:bg-input/70 hover:border-border',
-    ghost: 'text-muted-foreground hover:text-foreground hover:bg-input/40',
-    danger: 'border border-destructive/40 bg-destructive/10 text-destructive hover:bg-destructive/20',
+    primary: 'bg-primary text-primary-foreground shadow-[0_2px_6px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_18px_-6px_rgba(48,153,201,0.45)] hover:bg-primary/90',
+    secondary: 'border border-border bg-card text-foreground shadow-[0_2px_6px_rgba(15,23,42,0.04)] hover:border-primary/40 hover:bg-accent/40',
+    ghost: 'text-muted-foreground hover:text-foreground hover:bg-muted',
+    danger: 'border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10',
   }[variant]
   return (
     <button {...props} disabled={props.disabled || loading} className={`${base} ${sizes} ${styles} ${props.className ?? ''}`}>
@@ -91,15 +91,15 @@ export function Button({
 }
 
 const BADGE_PRESETS: Record<string, string> = {
-  success: '#47cd89',
-  warning: '#f0b254',
-  info: '#61f0fe',
-  danger: '#f97066',
-  neutral: '#9ca3af',
+  success: '#16a34a',
+  warning: '#d97706',
+  info: '#3099c9',
+  danger: '#dc2626',
+  neutral: '#64748b',
 }
 
 export function Badge({
-  children, color = '#61f0fe', tone, dot = false,
+  children, color = '#3099c9', tone, dot = false,
 }: { children: ReactNode; color?: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; dot?: boolean }) {
   const c = tone ? BADGE_PRESETS[tone] : color
   return (
@@ -202,7 +202,7 @@ export function EmptyState({ icon = '○', title, hint }: { icon?: ReactNode; ti
 }
 
 export function Skeleton({ className = '' }: { className?: string }) {
-  return <div className={`animate-pulse rounded-lg bg-input/50 ${className}`} />
+  return <div className={`animate-pulse rounded-lg bg-muted ${className}`} />
 }
 
 export function Stat({ label, value, accent }: { label: string; value: ReactNode; accent?: string }) {

@@ -63,7 +63,7 @@ export function PoolsTab() {
                   </div>
                   <div className="font-semibold text-sm">{pool.poolNameStr}</div>
                 </div>
-                <Badge color={pool.permissioned ? '#f97066' : '#47cd89'}>
+                <Badge tone={pool.permissioned ? 'danger' : 'success'}>
                   {pool.permissioned ? 'Private' : 'Open'}
                 </Badge>
               </div>

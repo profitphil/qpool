@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useWallet } from '../context/WalletContext'
 import { getPool, type Pool } from '../qubic/decode'
 import { scanHoldingsForPool, scanProposalsForPool } from '../qubic/scan'
 import type { Holding, Proposal } from '../qubic/decode'
-import { Badge, Button, Card, ErrorText, KV } from './ui'
+import { Badge, Button, Card, ErrorText, Identity, KV } from './ui'
 import { ContributeForm } from './ContributeForm'
 import { DepositHoldingAssetForm } from './DepositHoldingAssetForm'
 import { ProposeForm } from './ProposeForm'
@@ -11,6 +12,7 @@ import { ProposalRow } from './ProposalRow'
 import { SeatMarket } from './SeatMarket'
 
 export function PoolDetail({ poolId }: { poolId: number }) {
+  const { wallet } = useWallet()
   const [pool, setPool] = useState<Pool | null>(null)
   const [holdings, setHoldings] = useState<{ id: number; holding: Holding }[]>([])
   const [proposals, setProposals] = useState<{ id: number; proposal: Proposal }[]>([])
@@ -51,14 +53,16 @@ export function PoolDetail({ poolId }: { poolId: number }) {
   if (!pool) return <div className="text-sm text-muted-foreground">Loading pool #{poolId}...</div>
   if (pool.found !== 1) return <ErrorText>Pool #{poolId} not found.</ErrorText>
 
+  const isCreator = wallet?.identity === pool.creator
+
   return (
     <div className="space-y-4">
       <Card title={`Pool #${poolId}: ${pool.poolNameStr}`}>
         <div className="flex items-center justify-between">
           <Button onClick={() => void loadPool()}>refresh</Button>
-          <Badge color={pool.permissioned ? '#f97066' : '#47cd89'}>{pool.permissioned ? 'Private' : 'Open to anyone'}</Badge>
+          <Badge tone={pool.permissioned ? 'danger' : 'success'}>{pool.permissioned ? 'Private' : 'Open to anyone'}</Badge>
         </div>
-        <KV k="creator" v={pool.creator} />
+        <KV k="creator" v={<Identity id={pool.creator} />} />
         <KV k="members" v={pool.contributorCount.toString()} />
         <KV k="available funds (not yet allocated)" v={`${pool.uncommittedTotal.toLocaleString()} QU`} />
         <KV k="allocated funds" v={`${pool.committedTotal.toLocaleString()} QU`} />
@@ -71,9 +75,11 @@ export function PoolDetail({ poolId }: { poolId: number }) {
         <ContributeForm poolId={poolId} onChanged={loadPool} />
       </Card>
 
-      <Card title="Deposit a token">
-        <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
-      </Card>
+      {isCreator && (
+        <Card title="Deposit a token" right={<Badge tone="info">creator only -- only you can see this</Badge>}>
+          <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
+        </Card>
+      )}
 
       <Card title="Propose a pool action">
         <ProposeForm poolId={poolId} holdings={holdings} onChanged={loadExtras} />
