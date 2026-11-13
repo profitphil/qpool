@@ -145,10 +145,12 @@ export const EPOCH_TICKS_ESTIMATE = 1400
 export const TICKS_PER_SECOND_ESTIMATE = 2
 
 export const TICKS_PER_HOUR = 2
-export const VOTE_WINDOW = 72 * TICKS_PER_HOUR
-export const EXECUTE_WINDOW = 48 * TICKS_PER_HOUR
+// Widened from 72/48/24 -- see QPoolK6.h, the original gave a 24s IPO vote
+// window, not enough real time to vote through the web UI across wallets.
+export const VOTE_WINDOW = 300 * TICKS_PER_HOUR
+export const EXECUTE_WINDOW = 180 * TICKS_PER_HOUR
 export const PROPOSAL_LIFETIME = VOTE_WINDOW + EXECUTE_WINDOW
-export const IPO_VOTE_WINDOW = 24 * TICKS_PER_HOUR
+export const IPO_VOTE_WINDOW = 240 * TICKS_PER_HOUR
 export const IPO_PROPOSAL_LIFETIME = IPO_VOTE_WINDOW + EXECUTE_WINDOW
 
 export const NULL_ID = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB'
