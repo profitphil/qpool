@@ -1,14 +1,59 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useWallet } from '../context/WalletContext'
 import { submitProcedureCall } from '../qubic/transaction'
 import { payQxAddToBidOrder } from '../qubic/encode'
 import { getTick } from '../qubic/rpc'
 import { scanPools, scanAllHoldings, scanAllPoolOffers, scanAssetAsks, type AssetListing } from '../qubic/scan'
+import { scanKnownAssetCatalog, type KnownAsset } from '../qubic/knownAssets'
 import { QX, QX_P_ADD_TO_BID_ORDER } from '../qubic/config'
 import { activeIpoTargets } from './EpochBanner'
-import { useAction } from '../hooks/useAction'
 import { BuyRow } from './SeatMarket'
-import { Button, Card, ErrorText, Field, KV, SuccessText, TextInput } from './ui'
+import { useAction } from '../hooks/useAction'
+import { Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Identity, Skeleton, Stat, SuccessText, TextInput } from './ui'
+
+function IconTicket() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M2 9a3 3 0 0 1 0 6v3a1 1 0 0 0 1 1h18a1 1 0 0 0 1-1v-3a3 3 0 0 1 0-6V6a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1z" />
+      <path d="M13 5v2M13 17v2M13 10v4" />
+    </svg>
+  )
+}
+function IconBook() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20V3H6.5A2.5 2.5 0 0 0 4 5.5z" />
+      <path d="M4 19.5V5.5M4 19.5A2.5 2.5 0 0 0 6.5 22H20v-3" />
+    </svg>
+  )
+}
+function IconSeat() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 11V7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4" />
+      <path d="M3 11h18v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
+      <path d="M5 17v3M19 17v3" />
+    </svg>
+  )
+}
+function IconCoins() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <ellipse cx="9" cy="6" rx="6" ry="3" />
+      <path d="M3 6v6c0 1.66 2.69 3 6 3s6-1.34 6-3V6" />
+      <path d="M3 12v6c0 1.66 2.69 3 6 3 2.08 0 3.9-.56 5-1.42" />
+      <path d="M15 8.07c2.98.38 5 1.59 5 2.93 0 1.66-2.69 3-6 3-.34 0-.68-.01-1-.04M15 15c2.76 0 5-1.34 5-3v6c0 1.66-2.24 3-5 3s-5-1.34-5-3v-2" />
+    </svg>
+  )
+}
+function IconSearch() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="11" cy="11" r="7" />
+      <path d="m20 20-3.2-3.2" />
+    </svg>
+  )
+}
 
 function QuickBidRow({ listing, onChanged }: { listing: AssetListing; onChanged?: () => void }) {
   const { wallet } = useWallet()
@@ -29,19 +74,29 @@ function QuickBidRow({ listing, onChanged }: { listing: AssetListing; onChanged?
   }
 
   return (
-    <div className="border border-border rounded p-2 space-y-1">
-      <KV k="asset" v={listing.assetNameStr} />
-      <KV k="issuer" v={listing.issuer} />
-      <KV k="lowest ask" v={`${best.price.toString()} QU/share`} />
-      <KV k="resting shares (this price)" v={best.numberOfShares.toString()} />
-      <KV k="resting shares (all asks)" v={totalShares.toString()} />
+    <div className="border border-border rounded-xl p-3 space-y-2.5 bg-input/20">
+      <div className="flex items-center gap-2">
+        <Avatar seed={listing.assetNameStr} />
+        <div className="min-w-0">
+          <div className="font-semibold text-sm truncate">{listing.assetNameStr}</div>
+          <Identity id={listing.issuer} label="issuer" />
+        </div>
+        <Badge tone="info" dot>on QX</Badge>
+      </div>
+      <div className="flex items-baseline justify-between">
+        <Stat label="lowest ask" value={`${best.price.toString()} QU`} accent="var(--color-primary)" />
+        <div className="text-right text-xs text-muted-foreground">
+          <div>{best.numberOfShares.toString()} at this price</div>
+          <div>{totalShares.toString()} resting total</div>
+        </div>
+      </div>
       {wallet && (
-        <div className="flex gap-2 items-end">
+        <div className="flex gap-2 items-end pt-1 border-t border-border/50">
           <Field label="shares to bid for">
             <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
           </Field>
-          <Button disabled={busy} onClick={() => void bid()}>
-            {busy ? 'bidding...' : `Bid @ ${best.price.toString()}`}
+          <Button variant="primary" size="sm" loading={busy} onClick={() => void bid()}>
+            Bid @ {best.price.toString()}
           </Button>
         </div>
       )}
@@ -51,24 +106,48 @@ function QuickBidRow({ listing, onChanged }: { listing: AssetListing; onChanged?
   )
 }
 
+function KnownAssetRow({ asset, hasLiveAsk }: { asset: KnownAsset; hasLiveAsk: boolean }) {
+  return (
+    <div className="flex items-center gap-3 py-2 border-b border-border/40 last:border-0">
+      <Avatar seed={asset.assetNameStr} size={28} />
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center gap-2">
+          <span className="font-medium text-sm">{asset.assetNameStr}</span>
+          {hasLiveAsk && <Badge tone="success" dot>listed on QX</Badge>}
+        </div>
+        <Identity id={asset.issuer} label="issuer" />
+      </div>
+      <div className="text-right text-xs">
+        <div className="font-mono tabular-nums">{asset.totalUnits.toLocaleString()}</div>
+        <div className="text-muted-foreground">{asset.holders.length} known holder{asset.holders.length === 1 ? '' : 's'}</div>
+      </div>
+    </div>
+  )
+}
+
 export function Marketplace() {
   const [epoch, setEpoch] = useState<number | null>(null)
   const [listings, setListings] = useState<AssetListing[]>([])
   const [offers, setOffers] = useState<Awaited<ReturnType<typeof scanAllPoolOffers>>>([])
+  const [known, setKnown] = useState<KnownAsset[] | null>(null)
+  const [query, setQuery] = useState('')
   const [scanLimit, setScanLimit] = useState(60)
   const [busy, setBusy] = useState(false)
+  const [loadedOnce, setLoadedOnce] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   async function load() {
     setBusy(true)
     setError(null)
     try {
-      const [{ epoch: e }, pools] = await Promise.all([getTick(), scanPools(30)])
+      const [{ epoch: e }, pools, knownCatalog] = await Promise.all([getTick(), scanPools(30), scanKnownAssetCatalog()])
       setEpoch(e)
+      setKnown(knownCatalog)
       const holdings = await scanAllHoldings(scanLimit)
-      const candidates = holdings.map(({ holding: h }) => ({
-        issuer: h.issuer, assetName: h.assetName, assetNameStr: h.assetNameStr,
-      }))
+      const candidates = [
+        ...holdings.map(({ holding: h }) => ({ issuer: h.issuer, assetName: h.assetName, assetNameStr: h.assetNameStr })),
+        ...knownCatalog.map((a) => ({ issuer: a.issuer, assetName: a.assetName, assetNameStr: a.assetNameStr })),
+      ]
       const [assetListings, poolOffers] = await Promise.all([
         scanAssetAsks(candidates),
         scanAllPoolOffers(pools),
@@ -79,6 +158,7 @@ export function Marketplace() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setBusy(false)
+      setLoadedOnce(true)
     }
   }
 
@@ -88,39 +168,76 @@ export function Marketplace() {
   }, [])
 
   const active = epoch === null ? [] : activeIpoTargets(epoch)
+  const askedAssetKeys = useMemo(() => new Set(listings.map((l) => `${l.issuer}:${l.assetName}`)), [listings])
+  const filteredKnown = useMemo(() => {
+    if (!known) return []
+    const q = query.trim().toUpperCase()
+    return q ? known.filter((a) => a.assetNameStr.toUpperCase().includes(q)) : known
+  }, [known, query])
 
   return (
     <div className="space-y-4">
-      <Card title="What's for sale right now">
+      <Card
+        title="What's for sale right now"
+        icon={<IconCoins />}
+        right={
+          <div className="flex gap-2">
+            <Button size="sm" loading={busy} onClick={() => void load()}>rescan</Button>
+            <Button size="sm" variant="ghost" onClick={() => setScanLimit((n) => n + 60)}>+60 holding slots</Button>
+          </div>
+        }
+      >
         <div className="text-xs text-muted-foreground">
-          Scans the first {scanLimit} holding slots and the first 30 pools for anything currently listed --
-          resting asks on QX's raw order book, open seats on a pool's internal seat market, and any IPO
-          target currently taking bids. New deposits outside this range won't show up until you scan more.
+          Resting QX asks, open pool seat-market offers, any IPO taking bids, and every token known to exist on this
+          testnet -- whether or not it's ever touched a pool. Scanning the first {scanLimit} holding slots and first
+          30 pools for live listings.
         </div>
-        <div className="flex gap-2 items-center">
-          <Button disabled={busy} onClick={() => void load()}>
-            {busy ? 'scanning...' : 'rescan'}
-          </Button>
-          <Button onClick={() => setScanLimit((n) => n + 60)}>scan 60 more holding slots</Button>
+        <div className="relative max-w-xs">
+          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"><IconSearch /></span>
+          <TextInput
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search known tokens (e.g. QDOGE)"
+            className="pl-8"
+          />
         </div>
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <Card title={`IPO open for bidding (${active.length})`}>
-        {active.length === 0 ? (
-          <div className="text-xs text-muted-foreground">None open this epoch.</div>
+      <Card title={`IPO open for bidding (${active.length})`} icon={<IconTicket />}>
+        {!loadedOnce ? (
+          <Skeleton className="h-10" />
+        ) : active.length === 0 ? (
+          <EmptyState icon="🎟" title="No IPO open this epoch" />
         ) : (
-          <div className="space-y-1">
+          <div className="grid sm:grid-cols-2 gap-2">
             {active.map((t) => (
-              <KV key={t.index} k={`${t.name} (contract index ${t.index})`} v={'use Propose -> "Bid in an IPO" in any pool'} />
+              <div key={t.index} className="flex items-center justify-between border border-border rounded-xl p-3 bg-input/20">
+                <div className="flex items-center gap-2">
+                  <Avatar seed={t.name} size={28} />
+                  <div>
+                    <div className="font-semibold text-sm">{t.name}</div>
+                    <div className="text-xs text-muted-foreground">contract index {t.index}</div>
+                  </div>
+                </div>
+                <Badge tone="warning" dot>bidding open</Badge>
+              </div>
             ))}
           </div>
         )}
+        {active.length > 0 && (
+          <div className="text-[11px] text-muted-foreground">Use Propose &rarr; "Bid in an IPO" in any pool, with that contract index.</div>
+        )}
       </Card>
 
-      <Card title={`QX order book -- resting asks (${listings.length} asset${listings.length === 1 ? '' : 's'})`}>
-        {listings.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No resting asks found on any token seen in a holding so far.</div>
+      <Card title={`QX order book -- resting asks (${listings.length})`} icon={<IconBook />}>
+        {!loadedOnce ? (
+          <div className="grid sm:grid-cols-2 gap-2">
+            <Skeleton className="h-28" />
+            <Skeleton className="h-28" />
+          </div>
+        ) : listings.length === 0 ? (
+          <EmptyState icon="📭" title="No resting asks right now" hint="Checked every token seen in a holding or held by a known testnet wallet." />
         ) : (
           <div className="grid sm:grid-cols-2 gap-2">
             {listings.map((l, i) => (
@@ -130,18 +247,42 @@ export function Marketplace() {
         )}
       </Card>
 
-      <Card title={`Pool seats for sale (${offers.length})`}>
-        {offers.length === 0 ? (
-          <div className="text-xs text-muted-foreground">No open seat-market offers in the first 30 pools.</div>
+      <Card title={`Pool seats for sale (${offers.length})`} icon={<IconSeat />}>
+        {!loadedOnce ? (
+          <Skeleton className="h-20" />
+        ) : offers.length === 0 ? (
+          <EmptyState icon="🪑" title="No open seat-market offers" hint="Checked the first 30 pools." />
         ) : (
           <div className="grid sm:grid-cols-2 gap-2">
             {offers.map((o, i) => (
-              <div key={i} className="space-y-1">
-                <div className="text-xs font-semibold">
-                  Pool: {o.poolName} (#{o.poolId})
+              <div key={i} className="space-y-1.5">
+                <div className="flex items-center gap-1.5 text-xs">
+                  <Badge tone="neutral">{o.poolName} (#{o.poolId})</Badge>
                 </div>
                 <BuyRow offer={o} onChanged={load} />
               </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title={`Known tokens on this testnet (${filteredKnown.length})`} icon={<IconCoins />}>
+        <div className="text-xs text-muted-foreground">
+          Every token any of this devkit's known demo/test wallets currently hold, regardless of whether it's in a
+          pool or listed anywhere -- this is the full catalog, not just active listings.
+        </div>
+        {!loadedOnce ? (
+          <Skeleton className="h-24" />
+        ) : filteredKnown.length === 0 ? (
+          <EmptyState
+            icon="🔍"
+            title={query ? `No token matching "${query}"` : 'No tokens found'}
+            hint={query ? 'Nothing issued under that name among this testnet\'s known wallets.' : undefined}
+          />
+        ) : (
+          <div>
+            {filteredKnown.map((a, i) => (
+              <KnownAssetRow key={i} asset={a} hasLiveAsk={askedAssetKeys.has(`${a.issuer}:${a.assetName}`)} />
             ))}
           </div>
         )}

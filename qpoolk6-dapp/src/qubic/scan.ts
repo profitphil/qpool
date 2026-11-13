@@ -12,7 +12,7 @@ import {
 // tunnel (the recommended backend-exposure option for this app) rate-limits
 // bursts; confirmed live, 100 simultaneous queries triggered HTTP 429s. Still
 // well ahead of doing these one at a time.
-async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+export async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
   const out: R[] = new Array(items.length)
   let next = 0
   async function worker() {
@@ -25,7 +25,7 @@ async function mapLimited<T, R>(items: T[], limit: number, fn: (item: T) => Prom
   return out
 }
 
-const SCAN_CONCURRENCY = 3
+export const SCAN_CONCURRENCY = 3
 
 export async function scanPools(maxScan = 100): Promise<{ id: number; pool: Pool }[]> {
   const ids = Array.from({ length: maxScan }, (_, i) => i)
