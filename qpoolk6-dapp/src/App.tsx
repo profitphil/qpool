@@ -9,12 +9,15 @@ import { ReleaseManagedSharesForm } from './components/ReleaseManagedSharesForm'
 import { WalletLookup } from './components/WalletLookup'
 import { Marketplace } from './components/Marketplace'
 import { QxMarket } from './components/QxMarket'
-import { IconMarket, IconPool, IconStats, IconTools } from './components/icons'
+import { IpoBoard } from './components/IpoBoard'
+import { IconBook, IconPool, IconSeat, IconStats, IconTicket, IconTools } from './components/icons'
 
 const TABS = [
   { key: 'Pools', label: 'Pools', icon: <IconPool />, tone: '#b0f9fe' },
-  { key: 'Market', label: 'Market', icon: <IconMarket />, tone: '#47cd89' },
-  { key: 'Tools', label: 'Tools', icon: <IconTools />, tone: '#cda747' },
+  { key: 'QX', label: 'QX', icon: <IconBook />, tone: '#f97066' },
+  { key: 'IPO', label: 'IPO', icon: <IconTicket />, tone: '#cda747' },
+  { key: 'Marketplace', label: 'Marketplace', icon: <IconSeat />, tone: '#47cd89' },
+  { key: 'Tools', label: 'Tools', icon: <IconTools />, tone: '#9b8cf0' },
   { key: 'Stats', label: 'Stats', icon: <IconStats />, tone: '#bdbdbd' },
 ] as const
 type Tab = (typeof TABS)[number]['key']
@@ -85,12 +88,9 @@ export default function App() {
           <main className="flex-1 min-w-0 space-y-4">
             <WalletPanel />
             {tab === 'Pools' && <PoolsTab />}
-            {tab === 'Market' && (
-              <div className="space-y-4">
-                <Marketplace />
-                <QxMarket />
-              </div>
-            )}
+            {tab === 'QX' && <QxMarket />}
+            {tab === 'IPO' && <IpoBoard />}
+            {tab === 'Marketplace' && <Marketplace />}
             {tab === 'Tools' && (
               <div className="space-y-4">
                 <WalletLookup />
