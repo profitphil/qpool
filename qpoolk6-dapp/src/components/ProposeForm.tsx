@@ -9,7 +9,7 @@ import {
 } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import type { Holding } from '../qubic/decode'
-import { Button, ErrorText, Field, Select, SuccessText, TextInput } from './ui'
+import { AmountInput, Button, ErrorText, Field, Select, SuccessText, TextInput } from './ui'
 
 const KINDS = [
   KIND_BUY_QSWAP, KIND_BUY_QX, KIND_BUY_IPO, KIND_SELL_QSWAP, KIND_SELL_QX, KIND_ALLOCATE, KIND_SELL_QX_LIMIT,
@@ -172,7 +172,7 @@ export function ProposeForm({
           label={budgetLabel}
           hint={budgetSpendsPoolFunds ? `Pool has ${availableFunds.toLocaleString()} QU available (not yet allocated).` : undefined}
         >
-          <TextInput value={quAmount} onChange={(e) => setQuAmount(e.target.value)} inputMode="numeric" required={isIpo} />
+          <AmountInput value={quAmount} onChange={setQuAmount} />
         </Field>
       )}
       {budgetExceedsFunds && (
@@ -183,12 +183,12 @@ export function ProposeForm({
       )}
       {showShares && (
         <Field label={sharesLabel}>
-          <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
+          <AmountInput value={shares} onChange={setShares} />
         </Field>
       )}
       {showPrice && (
         <Field label={priceLabel}>
-          <TextInput value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" required={isIpo} />
+          <AmountInput value={price} onChange={setPrice} />
         </Field>
       )}
 

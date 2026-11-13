@@ -13,7 +13,7 @@ import { scanAllHoldings, scanAssetAsks, type AssetListing } from '../qubic/scan
 import { scanKnownAssetCatalog, type KnownAsset } from '../qubic/knownAssets'
 import { QX, QX_P_ADD_TO_ASK_ORDER, QX_P_ADD_TO_BID_ORDER, QX_P_REMOVE_FROM_ASK_ORDER, QX_P_REMOVE_FROM_BID_ORDER } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Identity, KV, Select, Skeleton, Stat, SuccessText, TextInput } from './ui'
+import { AmountInput, Avatar, Badge, Button, Card, EmptyState, ErrorText, Field, Identity, KV, Select, Skeleton, Stat, SuccessText, TextInput } from './ui'
 import { AssetPicker } from './AssetPicker'
 import { IconBook, IconCoins, IconList, IconPlus, IconSearch } from './icons'
 
@@ -55,7 +55,7 @@ function QuickBidRow({ listing, onChanged }: { listing: AssetListing; onChanged?
       {wallet && (
         <div className="flex gap-2 items-end pt-1 border-t border-border/50">
           <Field label="shares to bid for">
-            <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
+            <AmountInput value={shares} onChange={setShares} />
           </Field>
           <Button variant="primary" size="sm" loading={busy} onClick={() => void bid()}>
             Bid @ {best.price.toString()}
@@ -131,10 +131,10 @@ function PlaceOrderForm({ knownAssets }: { knownAssets: KnownAsset[] }) {
         <TextInput value={assetName} onChange={(e) => setAssetName(e.target.value)} maxLength={7} placeholder="MYTOKEN" />
       </Field>
       <Field label="Price per share">
-        <TextInput value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" />
+        <AmountInput value={price} onChange={setPrice} />
       </Field>
       <Field label="Shares">
-        <TextInput value={shares} onChange={(e) => setShares(e.target.value)} inputMode="numeric" />
+        <AmountInput value={shares} onChange={setShares} />
       </Field>
       <Button variant="primary" loading={busy} disabled={!issuerId || !assetName || !price || !shares} onClick={() => void submit()}>
         Place {side}

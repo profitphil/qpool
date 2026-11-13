@@ -5,7 +5,7 @@ import { payDepositHoldingAsset } from '../qubic/encode'
 import { nameToU64 } from '../qubic/codec'
 import { QPOOLK6, P_DEPOSIT_HOLDING_ASSET } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Button, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { AmountInput, Button, ErrorText, Field, SuccessText, TextInput } from './ui'
 
 export function DepositHoldingAssetForm({ poolId, onChanged }: { poolId: number; onChanged?: () => void }) {
   const { wallet } = useWallet()
@@ -39,10 +39,10 @@ export function DepositHoldingAssetForm({ poolId, onChanged }: { poolId: number;
         <TextInput value={assetName} onChange={(e) => setAssetName(e.target.value)} maxLength={7} placeholder="MYTOKEN" />
       </Field>
       <Field label="Amount (shares)">
-        <TextInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" placeholder="1000" />
+        <AmountInput value={amount} onChange={setAmount} placeholder="1000" />
       </Field>
       <Field label="Seat units (cost basis; defaults to amount)">
-        <TextInput value={seatUnits} onChange={(e) => setSeatUnits(e.target.value)} inputMode="numeric" placeholder="(same as amount)" />
+        <AmountInput value={seatUnits} onChange={setSeatUnits} placeholder="(same as amount)" />
       </Field>
       <Button disabled={busy || !issuerId || !assetName || !amount} onClick={() => void submit()}>
         {busy ? 'submitting...' : 'Deposit token'}

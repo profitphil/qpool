@@ -62,6 +62,7 @@ export const P_CANCEL_QX_BID = 23
 export const P_SET_POOL_ADMINS = 24
 export const P_CANCEL_QX_ASK = 25
 export const P_REGISTER_DIVIDEND_PAYER = 26
+export const P_JOIN_POOL = 27
 
 // ---- functions ----
 export const F_GET_POOL = 1
@@ -123,7 +124,7 @@ export const ERR_NAMES: Record<number, string> = {
   32: 'SEAT_LOCKED', 33: 'DEPOSIT_AFTER_OPEN', 34: 'NAME_UNPROVEN', 35: 'IPO_NO_SNAPSHOT',
   36: 'PRICE_TOO_LOW', 37: 'SEATS_FULL', 38: 'OFFER_CHANGED', 39: 'NOTHING_TO_BUY',
   40: 'NO_PENDING_BID', 41: 'NAME_PENDING', 42: 'QX_SIDE_BUSY', 43: 'NO_PENDING_ASK',
-  44: 'SELF_CROSS', 45: 'POOL_SLOTS', 46: 'DUPLICATE_NAME',
+  44: 'SELF_CROSS', 45: 'POOL_SLOTS', 46: 'DUPLICATE_NAME', 47: 'ALREADY_MEMBER',
 }
 export function errName(code: number): string {
   return ERR_NAMES[code] ?? `UNKNOWN(${code})`

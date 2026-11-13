@@ -4,7 +4,7 @@ import { submitProcedureCall } from '../qubic/transaction'
 import { payRebidIpo, paySettleIpo } from '../qubic/encode'
 import { QPOOLK6, P_REBID_IPO, P_SETTLE_IPO } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Button, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { AmountInput, Button, ErrorText, Field, SuccessText } from './ui'
 
 export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onChanged?: () => void }) {
   const { wallet } = useWallet()
@@ -37,10 +37,10 @@ export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onCh
       <div className="text-xs font-semibold">IPO holding</div>
       <div className="flex gap-2 flex-wrap items-end">
         <Field label="New price">
-          <TextInput value={price} onChange={(e) => setPrice(e.target.value)} inputMode="numeric" className="w-24" />
+          <AmountInput value={price} onChange={setPrice} className="w-24" />
         </Field>
         <Field label="New quantity">
-          <TextInput value={quantity} onChange={(e) => setQuantity(e.target.value)} inputMode="numeric" className="w-24" />
+          <AmountInput value={quantity} onChange={setQuantity} className="w-24" />
         </Field>
         <Button disabled={rebid.busy || !price || !quantity} onClick={() => void submitRebid()}>
           {rebid.busy ? '...' : 'Update bid'}

@@ -71,6 +71,36 @@ export function TextInput(props: React.InputHTMLAttributes<HTMLInputElement>) {
   )
 }
 
+// Formats on the raw digit string itself (never via Number()) so it never
+// loses precision on amounts bigger than Number.MAX_SAFE_INTEGER.
+function withThousands(digits: string): string {
+  return digits.replace(/\B(?=(\d{3})+(?!\d))/g, ',')
+}
+
+// Drop-in for TextInput on integer amount fields (QU, shares, price) --
+// value/onChange still carry the plain digit string a BigInt(...) expects,
+// this only changes what's displayed while typing.
+export function AmountInput({
+  value, onChange, placeholder, className, disabled,
+}: {
+  value: string
+  onChange: (raw: string) => void
+  placeholder?: string
+  className?: string
+  disabled?: boolean
+}) {
+  return (
+    <TextInput
+      value={withThousands(value)}
+      onChange={(e) => onChange(e.target.value.replace(/[^0-9]/g, ''))}
+      placeholder={placeholder}
+      inputMode="numeric"
+      className={className}
+      disabled={disabled}
+    />
+  )
+}
+
 export function Select(props: React.SelectHTMLAttributes<HTMLSelectElement>) {
   return (
     <select

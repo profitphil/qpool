@@ -5,7 +5,7 @@ import { payReleaseManagedShares } from '../qubic/encode'
 import { nameToU64 } from '../qubic/codec'
 import { QPOOLK6, P_RELEASE_MANAGED_SHARES } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Button, Card, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { AmountInput, Button, Card, ErrorText, Field, SuccessText, TextInput } from './ui'
 import { IconUnlock } from './icons'
 
 export function ReleaseManagedSharesForm() {
@@ -40,7 +40,7 @@ export function ReleaseManagedSharesForm() {
         <TextInput value={assetName} onChange={(e) => setAssetName(e.target.value)} maxLength={7} placeholder="MYTOKEN" />
       </Field>
       <Field label="Amount">
-        <TextInput value={amount} onChange={(e) => setAmount(e.target.value)} inputMode="numeric" />
+        <AmountInput value={amount} onChange={setAmount} />
       </Field>
       <Field label="Destination contract index (e.g. 1 = QX)">
         <TextInput value={destIndex} onChange={(e) => setDestIndex(e.target.value)} inputMode="numeric" />

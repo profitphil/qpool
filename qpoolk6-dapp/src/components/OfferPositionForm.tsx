@@ -4,7 +4,7 @@ import { submitProcedureCall } from '../qubic/transaction'
 import { payOfferPosition } from '../qubic/encode'
 import { QPOOLK6, P_OFFER_POSITION } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
-import { Button, ErrorText, Field, SuccessText, TextInput } from './ui'
+import { AmountInput, Button, ErrorText, Field, SuccessText } from './ui'
 
 export function OfferPositionForm({ holdingId, onChanged }: { holdingId: number; onChanged?: () => void }) {
   const { wallet } = useWallet()
@@ -28,10 +28,10 @@ export function OfferPositionForm({ holdingId, onChanged }: { holdingId: number;
       <div className="text-xs font-semibold">Offer part of my position for sale</div>
       <div className="flex gap-2 flex-wrap items-end">
         <Field label="How much of your stake to sell">
-          <TextInput value={costUnits} onChange={(e) => setCostUnits(e.target.value)} inputMode="numeric" className="w-28" />
+          <AmountInput value={costUnits} onChange={setCostUnits} className="w-28" />
         </Field>
         <Field label="Asking price (total QU)">
-          <TextInput value={askPrice} onChange={(e) => setAskPrice(e.target.value)} inputMode="numeric" className="w-28" />
+          <AmountInput value={askPrice} onChange={setAskPrice} className="w-28" />
         </Field>
         <Button disabled={busy || !costUnits || !askPrice} onClick={() => void submit()}>
           {busy ? '...' : 'List for sale'}

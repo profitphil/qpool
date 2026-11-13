@@ -129,6 +129,35 @@ export const IconChart = () => (
     <path d="M6 13.5 9.5 9l2.5 2.5 4-5.5" />
   </Icon>
 )
+export const IconKey = () => (
+  <Icon>
+    <circle cx="7" cy="13" r="3.2" />
+    <path d="M9.3 10.7 16 4M13.2 7.8l2 2M15.7 5.3l2 2" />
+  </Icon>
+)
+export const IconVaultFile = () => (
+  <Icon>
+    <rect x="4" y="9" width="12" height="8" rx="1.6" />
+    <path d="M6.5 9V6.5a3.5 3.5 0 0 1 7 0V9" />
+    <circle cx="10" cy="13" r="1.1" fill="currentColor" stroke="none" />
+  </Icon>
+)
+export const IconMetaMask = () => (
+  <Icon>
+    <path d="M3 3.5 9 7l1 2" />
+    <path d="M17 3.5 11 7l-1 2" />
+    <path d="M4.5 14.5 3 12l1-4.5L7 9" />
+    <path d="M15.5 14.5 17 12l-1-4.5L13 9" />
+    <path d="M7 14.5h6l-1 2.5H8z" />
+  </Icon>
+)
+export const IconWalletConnect = () => (
+  <Icon>
+    <rect x="2.3" y="5.5" width="15.4" height="11" rx="2.3" />
+    <path d="M2.3 8.5h15.4" />
+    <circle cx="14" cy="12.3" r="1" fill="currentColor" stroke="none" />
+  </Icon>
+)
 export const IconToken = () => (
   <Icon>
     <circle cx="10" cy="10" r="7.2" />
