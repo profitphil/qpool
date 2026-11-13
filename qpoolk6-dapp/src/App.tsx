@@ -7,6 +7,7 @@ import { StatsPanel } from './components/StatsPanel'
 import { RegisterDividendPayerForm } from './components/RegisterDividendPayerForm'
 import { ReleaseManagedSharesForm } from './components/ReleaseManagedSharesForm'
 import { WalletLookup } from './components/WalletLookup'
+import { Marketplace } from './components/Marketplace'
 import { QxMarket } from './components/QxMarket'
 import { Button } from './components/ui'
 
@@ -38,7 +39,12 @@ export default function App() {
         </nav>
         <main className="p-4">
           {tab === 'Pools' && <PoolsTab />}
-          {tab === 'Market' && <QxMarket />}
+          {tab === 'Market' && (
+            <div className="space-y-4">
+              <Marketplace />
+              <QxMarket />
+            </div>
+          )}
           {tab === 'Tools' && (
             <div className="space-y-4">
               <WalletLookup />

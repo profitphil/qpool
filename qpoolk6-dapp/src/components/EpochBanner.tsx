@@ -10,10 +10,10 @@ function formatCountdown(seconds: number): string {
 }
 
 // A target's IPO window is always constructionEpoch - 1.
-function activeIpoTargets(epoch: number) {
+export function activeIpoTargets(epoch: number) {
   return IPO_TARGETS.filter((t) => t.constructionEpoch - 1 === epoch)
 }
-function nextIpoTarget(epoch: number) {
+export function nextIpoTarget(epoch: number) {
   const upcoming = IPO_TARGETS.filter((t) => t.constructionEpoch - 1 > epoch)
   if (upcoming.length === 0) return null
   return upcoming.reduce((a, b) => (a.constructionEpoch < b.constructionEpoch ? a : b))

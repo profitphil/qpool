@@ -3,7 +3,10 @@
 // exactly what the Python test suite's own find_proposal_id() does. Capped
 // scan ranges, not exhaustive: fine for a demo/testing UI, not for a pool
 // with thousands of entries.
-import { getPool, getHolding, getProposal, type Pool, type Holding, type Proposal } from './decode'
+import {
+  getPool, getHolding, getProposal, getPoolOffers, getAssetAskOrders,
+  type Pool, type Holding, type Proposal, type PoolOffer,
+} from './decode'
 
 // Concurrency-capped, not Promise.all(everything) -- a free Cloudflare quick
 // tunnel (the recommended backend-exposure option for this app) rate-limits
@@ -44,4 +47,46 @@ export async function scanProposalsForPool(poolId: number, maxScan = 60): Promis
   return ids
     .map((id, i) => ({ id, proposal: proposals[i] }))
     .filter((p) => p.proposal.found === 1 && p.proposal.poolId === BigInt(poolId))
+}
+
+// Same global holding array as scanHoldingsForPool, just unfiltered -- the
+// only way to find every token any pool currently holds (deposits are never
+// listed anywhere else).
+export async function scanAllHoldings(maxScan = 60): Promise<{ id: number; holding: Holding }[]> {
+  const ids = Array.from({ length: maxScan }, (_, i) => i)
+  const holdings = await mapLimited(ids, SCAN_CONCURRENCY, (id) => getHolding(id))
+  return ids.map((id, i) => ({ id, holding: holdings[i] })).filter((h) => h.holding.found === 1)
+}
+
+export interface PoolOfferWithPool extends PoolOffer {
+  poolId: number
+  poolName: string
+}
+// QPoolK6's seat market, across every pool at once -- GetPoolOffers only
+// answers for one pool at a time.
+export async function scanAllPoolOffers(pools: { id: number; pool: Pool }[]): Promise<PoolOfferWithPool[]> {
+  const offerLists = await mapLimited(pools, SCAN_CONCURRENCY, (p) => getPoolOffers(p.id))
+  const out: PoolOfferWithPool[] = []
+  pools.forEach((p, i) => {
+    offerLists[i].forEach((o) => out.push({ ...o, poolId: p.id, poolName: p.pool.poolNameStr }))
+  })
+  return out
+}
+
+export interface AssetListing {
+  issuer: string
+  assetName: bigint
+  assetNameStr: string
+  asks: Awaited<ReturnType<typeof getAssetAskOrders>>
+}
+// QX's raw order book has no "list every traded asset" query either -- the
+// only candidates worth probing are tokens we've already seen in a holding.
+export async function scanAssetAsks(
+  candidates: { issuer: string; assetName: bigint; assetNameStr: string }[],
+): Promise<AssetListing[]> {
+  const seen = new Map<string, { issuer: string; assetName: bigint; assetNameStr: string }>()
+  for (const c of candidates) seen.set(`${c.issuer}:${c.assetName}`, c)
+  const unique = Array.from(seen.values())
+  const asks = await mapLimited(unique, SCAN_CONCURRENCY, (c) => getAssetAskOrders(c.issuer, c.assetName))
+  return unique.map((c, i) => ({ ...c, asks: asks[i] })).filter((l) => l.asks.length > 0)
 }

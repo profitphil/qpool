@@ -7,7 +7,7 @@ import { QPOOLK6, P_BUY_POSITION, JOIN_FEE } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Button, Card, ErrorText, KV, SuccessText } from './ui'
 
-function BuyRow({ offer, onChanged }: { offer: PoolOffer; onChanged?: () => void }) {
+export function BuyRow({ offer, onChanged }: { offer: PoolOffer; onChanged?: () => void }) {
   const { wallet, refreshBalance } = useWallet()
   const { busy, error, result, run } = useAction<string>()
 
