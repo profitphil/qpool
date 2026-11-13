@@ -12,17 +12,17 @@ import { QxMarket } from './components/QxMarket'
 import { IconMarket, IconPool, IconStats, IconTools } from './components/icons'
 
 const TABS = [
-  { key: 'Pools', label: 'Pools', icon: <IconPool />, tone: '#3099c9' },
-  { key: 'Market', label: 'Market', icon: <IconMarket />, tone: '#16a34a' },
-  { key: 'Tools', label: 'Tools', icon: <IconTools />, tone: '#d97706' },
-  { key: 'Stats', label: 'Stats', icon: <IconStats />, tone: '#64748b' },
+  { key: 'Pools', label: 'Pools', icon: <IconPool />, tone: '#b0f9fe' },
+  { key: 'Market', label: 'Market', icon: <IconMarket />, tone: '#47cd89' },
+  { key: 'Tools', label: 'Tools', icon: <IconTools />, tone: '#cda747' },
+  { key: 'Stats', label: 'Stats', icon: <IconStats />, tone: '#bdbdbd' },
 ] as const
 type Tab = (typeof TABS)[number]['key']
 
 function Logo() {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-[0_4px_12px_-2px_rgba(48,153,201,0.5)]">
-      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#ffffff" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-primary to-primary/70 shadow-[0_4px_12px_-2px_rgba(176,249,254,0.4)]">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0c131b" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
         <circle cx="12" cy="12" r="9" />
         <path d="M12 7v10M8.5 9.5h5a2 2 0 1 1 0 4h-5m0 0h5a2 2 0 1 1 0 4h-5" />
       </svg>
@@ -33,7 +33,7 @@ function Logo() {
 function Sidebar({ tab, setTab }: { tab: Tab; setTab: (t: Tab) => void }) {
   return (
     <aside className="md:w-56 shrink-0">
-      <div className="md:sticky md:top-[76px] bg-card/90 backdrop-blur border border-border rounded-2xl shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] p-3 space-y-3">
+      <div className="md:sticky md:top-[76px] bg-card/90 backdrop-blur border border-border rounded-2xl shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_8px_20px_-10px_rgba(0,0,0,0.6)] p-3 space-y-3">
         <div className="flex items-center gap-2 px-1 py-1">
           <Logo />
           <div className="min-w-0">

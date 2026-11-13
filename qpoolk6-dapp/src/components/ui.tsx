@@ -6,11 +6,11 @@ function cx(...parts: Array<string | false | null | undefined>): string {
 }
 
 const TONE_COLORS: Record<string, string> = {
-  info: '#3099c9',
-  success: '#16a34a',
-  warning: '#d97706',
-  danger: '#dc2626',
-  neutral: '#64748b',
+  info: '#b0f9fe',
+  success: '#47cd89',
+  warning: '#cda747',
+  danger: '#f97066',
+  neutral: '#bdbdbd',
 }
 
 export function Card({
@@ -27,8 +27,8 @@ export function Card({
   return (
     <div
       className={cx(
-        'bg-card text-card-foreground border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] overflow-hidden',
-        interactive && 'transition-all duration-200 hover:border-primary/40 hover:shadow-[0_2px_8px_rgba(15,23,42,0.04),0_16px_36px_-16px_rgba(48,153,201,0.22)]',
+        'bg-card text-card-foreground border border-border rounded-[18px] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_8px_20px_-10px_rgba(0,0,0,0.6)] overflow-hidden',
+        interactive && 'transition-all duration-200 hover:border-primary/40 hover:shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_12px_28px_-10px_rgba(176,249,254,0.15)]',
       )}
     >
       {(title || right) && (
@@ -100,8 +100,8 @@ export function Button({
   const base = 'inline-flex items-center justify-center gap-1.5 rounded-xl font-semibold transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.97]'
   const sizes = size === 'sm' ? 'px-2.5 py-1 text-xs' : 'px-3.5 py-2 text-sm'
   const styles = {
-    primary: 'bg-primary text-primary-foreground shadow-[0_2px_6px_rgba(15,23,42,0.08)] hover:shadow-[0_8px_18px_-6px_rgba(48,153,201,0.45)] hover:bg-primary/90',
-    secondary: 'border border-border bg-card text-foreground shadow-[0_2px_6px_rgba(15,23,42,0.04)] hover:border-primary/40 hover:bg-accent/40',
+    primary: 'bg-primary text-primary-foreground shadow-[0_1px_0_rgba(255,255,255,0.4)_inset] hover:shadow-[0_1px_0_rgba(255,255,255,0.4)_inset,0_6px_16px_-4px_rgba(176,249,254,0.5)] hover:bg-primary/90',
+    secondary: 'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-accent/40',
     ghost: 'text-muted-foreground hover:text-foreground hover:bg-muted',
     danger: 'border border-destructive/30 bg-destructive/5 text-destructive hover:bg-destructive/10',
   }[variant]
@@ -113,18 +113,10 @@ export function Button({
   )
 }
 
-const BADGE_PRESETS: Record<string, string> = {
-  success: '#16a34a',
-  warning: '#d97706',
-  info: '#3099c9',
-  danger: '#dc2626',
-  neutral: '#64748b',
-}
-
 export function Badge({
-  children, color = '#3099c9', tone, dot = false,
+  children, color = '#b0f9fe', tone, dot = false,
 }: { children: ReactNode; color?: string; tone?: 'success' | 'warning' | 'info' | 'danger' | 'neutral'; dot?: boolean }) {
-  const c = tone ? BADGE_PRESETS[tone] : color
+  const c = tone ? TONE_COLORS[tone] : color
   return (
     <span
       className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium border"

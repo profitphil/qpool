@@ -21,7 +21,7 @@ export function WalletPanel() {
 
   if (wallet) {
     return (
-      <div className="bg-card border border-border rounded-[18px] shadow-[0_2px_8px_rgba(15,23,42,0.04),0_12px_32px_-18px_rgba(15,23,42,0.14)] p-4 space-y-2.5 text-sm">
+      <div className="bg-card border border-border rounded-[18px] shadow-[0_1px_0_rgba(255,255,255,0.04)_inset,0_8px_20px_-10px_rgba(0,0,0,0.6)] p-4 space-y-2.5 text-sm">
         <div className="flex items-center gap-3 flex-wrap">
           <Avatar seed={wallet.identity} size={34} />
           <div className="min-w-0">
@@ -42,7 +42,7 @@ export function WalletPanel() {
 
   return (
     <div className="flex justify-center py-6">
-      <div className="w-full max-w-[448px] bg-card border border-border rounded-[22px] shadow-[0_24px_70px_-20px_rgba(15,23,42,0.18)] p-8 space-y-4">
+      <div className="w-full max-w-[448px] bg-card border border-border rounded-[22px] shadow-[0_1px_0_rgba(255,255,255,0.05)_inset,0_24px_60px_-20px_rgba(0,0,0,0.7)] p-8 space-y-4">
         <div className="space-y-1">
           <div className="text-[10.5px] font-bold uppercase tracking-wider text-accent-foreground">Connect wallet</div>
           <h2 className="text-xl font-extrabold">Sign in to QPoolK6</h2>
@@ -87,7 +87,7 @@ export function WalletPanel() {
 
         <ErrorText>{error}</ErrorText>
 
-        <div className="flex items-start gap-1.5 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-2">
+        <div className="flex items-start gap-1.5 text-[11px] text-warning bg-warning/10 border border-warning/25 rounded-lg px-2.5 py-2">
           <span className="leading-none mt-px">&#9888;</span>
           <span>
             Testnet only. Your seed is kept in this browser tab's memory and used only to sign transactions locally --

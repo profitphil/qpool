@@ -60,7 +60,7 @@ export function PoolsTab() {
               onClick={() => setSelected(id)}
               role="button"
               tabIndex={0}
-              className="group text-left bg-card border border-border rounded-xl p-3 space-y-2 text-xs shadow-[0_2px_6px_rgba(15,23,42,0.04)] transition-all duration-200 hover:border-primary/50 hover:shadow-[0_12px_24px_-8px_rgba(48,153,201,0.25)] hover:-translate-y-0.5 cursor-pointer"
+              className="group text-left bg-card border border-border rounded-xl p-3 space-y-2 text-xs shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_4px_10px_-4px_rgba(0,0,0,0.5)] transition-all duration-200 hover:border-primary/50 hover:shadow-[0_1px_0_rgba(255,255,255,0.03)_inset,0_12px_24px_-8px_rgba(176,249,254,0.2)] hover:-translate-y-0.5 cursor-pointer"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">

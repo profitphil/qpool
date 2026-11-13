@@ -38,7 +38,7 @@ export function AssetPicker({ assets, onSelect }: { assets: KnownAsset[]; onSele
         />
       </div>
       {open && matches.length > 0 && (
-        <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-xl shadow-[0_12px_32px_-12px_rgba(15,23,42,0.25)] max-h-56 overflow-auto">
+        <div className="absolute z-10 mt-1 w-full bg-card border border-border rounded-xl shadow-[0_12px_32px_-12px_rgba(0,0,0,0.7)] max-h-56 overflow-auto">
           {matches.map((a, i) => (
             <button
               key={i}
