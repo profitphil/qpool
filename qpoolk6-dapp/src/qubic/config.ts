@@ -145,12 +145,14 @@ export const EPOCH_TICKS_ESTIMATE = 1400
 export const TICKS_PER_SECOND_ESTIMATE = 2
 
 export const TICKS_PER_HOUR = 2
-// Widened from 72/48/24 -- see QPoolK6.h, the original gave a 24s IPO vote
-// window, not enough real time to vote through the web UI across wallets.
-export const VOTE_WINDOW = 300 * TICKS_PER_HOUR
-export const EXECUTE_WINDOW = 180 * TICKS_PER_HOUR
+// Widened twice -- see QPoolK6.h. First pass (72/48/24 -> 300/180/240) still
+// gave only a 7-minute full lifetime; a real chat-paced propose/vote/tally
+// cycle took ~15 minutes and hit Tally's EXPIRED branch with 100% yes votes
+// already in. Now ~10min/~15min/~15min.
+export const VOTE_WINDOW = 900 * TICKS_PER_HOUR
+export const EXECUTE_WINDOW = 900 * TICKS_PER_HOUR
 export const PROPOSAL_LIFETIME = VOTE_WINDOW + EXECUTE_WINDOW
-export const IPO_VOTE_WINDOW = 240 * TICKS_PER_HOUR
+export const IPO_VOTE_WINDOW = 600 * TICKS_PER_HOUR
 export const IPO_PROPOSAL_LIFETIME = IPO_VOTE_WINDOW + EXECUTE_WINDOW
 
 export const NULL_ID = 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAFXIB'
