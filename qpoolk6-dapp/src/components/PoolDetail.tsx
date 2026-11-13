@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useWallet } from '../context/WalletContext'
 import { getPool, type Pool } from '../qubic/decode'
+import { getTick } from '../qubic/rpc'
 import { scanHoldingsForPool, scanProposalsForPool } from '../qubic/scan'
 import type { Holding, Proposal } from '../qubic/decode'
 import { Badge, Button, Card, ErrorText, Identity, KV } from './ui'
@@ -19,6 +20,7 @@ export function PoolDetail({ poolId }: { poolId: number }) {
   const [proposals, setProposals] = useState<{ id: number; proposal: Proposal }[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loadingExtras, setLoadingExtras] = useState(false)
+  const [tick, setTick] = useState<number | null>(null)
 
   async function loadPool() {
     try {
@@ -58,6 +60,26 @@ export function PoolDetail({ poolId }: { poolId: number }) {
     return () => clearTimeout(retry)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [poolId])
+
+  // Drives each ProposalRow's vote/execute countdown -- one shared poll here
+  // rather than every row fetching its own tick independently.
+  useEffect(() => {
+    let cancelled = false
+    async function poll() {
+      try {
+        const t = await getTick()
+        if (!cancelled) setTick(t.tick)
+      } catch {
+        /* a missed tick poll just pauses the countdown, nothing else depends on it */
+      }
+    }
+    void poll()
+    const id = setInterval(poll, 5000)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [])
 
   if (!pool) return <div className="text-sm text-muted-foreground">Loading pool #{poolId}...</div>
   if (pool.found !== 1) return <ErrorText>Pool #{poolId} not found.</ErrorText>
@@ -123,7 +145,7 @@ export function PoolDetail({ poolId }: { poolId: number }) {
         <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
         <div className="grid sm:grid-cols-2 gap-2">
           {proposals.map(({ id, proposal }) => (
-            <ProposalRow key={id} id={id} proposal={proposal} onChanged={loadExtras} />
+            <ProposalRow key={id} id={id} proposal={proposal} currentTick={tick} onChanged={loadExtras} />
           ))}
         </div>
       </Card>
