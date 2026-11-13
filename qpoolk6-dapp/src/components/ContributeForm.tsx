@@ -25,7 +25,11 @@ export function ContributeForm({ poolId, onChanged }: { poolId: number; onChange
 
   async function submit() {
     await run(async () => {
-      const amt = BigInt(amount)
+      // A first-time join needs JOIN_FEE attached on top of the contribution
+      // itself -- the contract takes both in one invocationReward, not two
+      // separate amounts. Add it here so the field above just means "how
+      // much gets contributed," not "how much to attach."
+      const amt = BigInt(amount) + (isMember === false ? BigInt(JOIN_FEE) : 0n)
       const r = await submitProcedureCall(wallet!, QPOOLK6, P_CONTRIBUTE, amt, payContribute(poolId))
       await refreshBalance()
       setIsMember(true)
@@ -39,9 +43,10 @@ export function ContributeForm({ poolId, onChanged }: { poolId: number; onChange
       <div className="space-y-2">
         <div className="text-xs text-muted-foreground">
           You're not a member of this pool yet. Joining is a one-time contribution with a small join fee
-          ({JOIN_FEE.toLocaleString()} QU) on top -- after this you're a member and can contribute freely.
+          ({JOIN_FEE.toLocaleString()} QU) added on top automatically -- after this you're a member and can
+          contribute freely.
         </div>
-        <Field label={`Amount to join with (min ${MIN_CONTRIBUTION.toLocaleString()} QU, plus the join fee)`}>
+        <Field label={`Amount to join with (min ${MIN_CONTRIBUTION.toLocaleString()} QU)`} hint={`+${JOIN_FEE.toLocaleString()} QU join fee added automatically.`}>
           <TextInput value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="1000000" inputMode="numeric" />
         </Field>
         <Button variant="primary" loading={busy} disabled={!amount} onClick={() => void submit()}>

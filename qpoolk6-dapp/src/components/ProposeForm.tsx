@@ -18,10 +18,12 @@ const KINDS = [
 export function ProposeForm({
   poolId,
   holdings,
+  availableFunds,
   onChanged,
 }: {
   poolId: number
   holdings: { id: number; holding: Holding }[]
+  availableFunds: bigint
   onChanged?: () => void
 }) {
   const { wallet } = useWallet()
@@ -52,6 +54,12 @@ export function ProposeForm({
   const showShares = isBuyQswap || isBuyQx || kind === KIND_SELL_QSWAP || kind === KIND_SELL_QX || kind === KIND_SELL_QX_LIMIT
   const showPrice = isBuyQx || isIpo || kind === KIND_SELL_QX || kind === KIND_SELL_QX_LIMIT
   const showBudget = kind !== KIND_SELL_QX_LIMIT // forced to 0 for SELL_QX_LIMIT (QPoolK6.h requires quAmount==0 there)
+  // Only BUY_* kinds spend the pool's own funds (quAmount is a budget, not a
+  // floor like it is for SELL_*) -- confirmed directly in QPoolK6.h's
+  // Propose(): all three refuse with INVALID_INPUT if quAmount exceeds
+  // uncommittedTotal, silently, with no proposal record left behind.
+  const budgetSpendsPoolFunds = isBuyQswap || isBuyQx || isIpo
+  const budgetExceedsFunds = budgetSpendsPoolFunds && !!quAmount && BigInt(quAmount) > availableFunds
   const budgetLabel = isIpo
     ? 'Budget (max QU for this bid) *'
     : isBuyQswap || isBuyQx
@@ -76,7 +84,8 @@ export function ProposeForm({
     (!showIpoTarget || !!holdingOrTargetId) &&
     (!showPayerIndex || !!holdingOrTargetId) &&
     (!showHoldingPicker || !!holdingOrTargetId) &&
-    (!showTokenFields || (!!issuerId && !!assetName))
+    (!showTokenFields || (!!issuerId && !!assetName)) &&
+    !budgetExceedsFunds
 
   async function submit() {
     await run(async () => {
@@ -159,9 +168,18 @@ export function ProposeForm({
       )}
 
       {showBudget && (
-        <Field label={budgetLabel}>
+        <Field
+          label={budgetLabel}
+          hint={budgetSpendsPoolFunds ? `Pool has ${availableFunds.toLocaleString()} QU available (not yet allocated).` : undefined}
+        >
           <TextInput value={quAmount} onChange={(e) => setQuAmount(e.target.value)} inputMode="numeric" required={isIpo} />
         </Field>
+      )}
+      {budgetExceedsFunds && (
+        <ErrorText>
+          That's more than this pool has available ({availableFunds.toLocaleString()} QU) -- it would be refused
+          silently with no proposal created. Contribute more first, or lower the budget.
+        </ErrorText>
       )}
       {showShares && (
         <Field label={sharesLabel}>

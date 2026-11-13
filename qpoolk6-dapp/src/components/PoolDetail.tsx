@@ -80,7 +80,7 @@ export function PoolDetail({ poolId }: { poolId: number }) {
         </Card>
 
         <Card title="Propose a pool action" icon={<IconVote />} iconTone="warning">
-          <ProposeForm poolId={poolId} holdings={holdings} onChanged={loadExtras} />
+          <ProposeForm poolId={poolId} holdings={holdings} availableFunds={pool.uncommittedTotal} onChanged={loadExtras} />
         </Card>
 
         {isCreator && (

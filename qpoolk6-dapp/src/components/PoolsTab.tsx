@@ -41,7 +41,7 @@ export function PoolsTab() {
 
   return (
     <div className="space-y-4">
-      <CreatePoolForm onCreated={load} />
+      <CreatePoolForm existingNames={pools.map(({ pool }) => pool.poolNameStr)} onCreated={load} />
       <Card
         title={`Pools (${pools.length} found in first ${scanLimit} slots)`}
         icon={<IconPool />}
