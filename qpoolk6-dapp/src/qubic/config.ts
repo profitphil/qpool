@@ -145,14 +145,14 @@ export const EPOCH_TICKS_ESTIMATE = 1400
 export const TICKS_PER_SECOND_ESTIMATE = 2
 
 export const TICKS_PER_HOUR = 2
-// Non-IPO proposals aren't tied to any outside clock -- VOTE_WINDOW/
-// EXECUTE_WINDOW stay generous (~15min each) for a real chat-paced test
-// session. BUY_IPO now uses its OWN separate, short IPO_VOTE_WINDOW/
-// IPO_EXECUTE_WINDOW (3min/3min): the IPO target itself only takes bids for
-// one epoch (~1400 ticks / ~11m40s, see EPOCH_TICKS_ESTIMATE above), and
-// END_EPOCH snapshots it the moment the epoch turns over -- a long vote+
-// execute cycle doesn't get more time, it just finds the IPO already gone.
-export const VOTE_WINDOW = 900 * TICKS_PER_HOUR
+// Voting is 3min for every proposal kind now. Execute stays kind-split:
+// non-IPO EXECUTE_WINDOW stays generous (~15min) for a real chat-paced test
+// session; BUY_IPO's own IPO_EXECUTE_WINDOW stays short (3min) since the
+// IPO target itself only takes bids for one epoch (~1400 ticks / ~11m40s,
+// see EPOCH_TICKS_ESTIMATE above), and END_EPOCH snapshots it the moment
+// the epoch turns over -- a cycle that runs long doesn't get more time, it
+// just finds the IPO already gone.
+export const VOTE_WINDOW = 180 * TICKS_PER_HOUR
 export const EXECUTE_WINDOW = 900 * TICKS_PER_HOUR
 export const PROPOSAL_LIFETIME = VOTE_WINDOW + EXECUTE_WINDOW
 export const IPO_VOTE_WINDOW = 180 * TICKS_PER_HOUR
