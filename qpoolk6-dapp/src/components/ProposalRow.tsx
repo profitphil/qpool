@@ -5,7 +5,7 @@ import { submitProcedureCall } from '../qubic/transaction'
 import { payVote, payTally, payExecute } from '../qubic/encode'
 import {
   QPOOLK6, P_VOTE, P_TALLY, P_EXECUTE, PROP_STATUS, KIND_NAMES, KIND_ALLOCATE, KIND_BUY_IPO, KIND_BUY_QSWAP,
-  KIND_SELL_QSWAP, IPO_TARGETS, VOTE_WINDOW, IPO_VOTE_WINDOW, EXECUTE_WINDOW, TICKS_PER_SECOND_ESTIMATE,
+  KIND_SELL_QSWAP, IPO_TARGETS, VOTE_WINDOW, IPO_VOTE_WINDOW, EXECUTE_WINDOW, IPO_EXECUTE_WINDOW, TICKS_PER_SECOND_ESTIMATE,
 } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Badge, Button, ErrorText, KV, SuccessText } from './ui'
@@ -52,9 +52,10 @@ export function ProposalRow({
   // point, same arithmetic). passedTick (used for the execute window) isn't
   // exposed by GetProposal, but Tally always sets it to exactly openTick +
   // window, so it's reproducible here without a contract change.
-  const voteWindow = kindNum === KIND_BUY_IPO ? IPO_VOTE_WINDOW : VOTE_WINDOW
+  const isIpo = kindNum === KIND_BUY_IPO
+  const voteWindow = isIpo ? IPO_VOTE_WINDOW : VOTE_WINDOW
   const voteEndTick = Number(proposal.openTick) + voteWindow
-  const executeEndTick = voteEndTick + EXECUTE_WINDOW
+  const executeEndTick = voteEndTick + (isIpo ? IPO_EXECUTE_WINDOW : EXECUTE_WINDOW)
   const ticksLeft =
     currentTick == null ? null : statusNum === 0 ? voteEndTick - currentTick : statusNum === 1 ? executeEndTick - currentTick : null
 
