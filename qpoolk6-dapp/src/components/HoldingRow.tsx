@@ -50,7 +50,7 @@ export function HoldingRow({ id, holding, onChanged }: { id: number; holding: Ho
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>
       {isIpo && <RebidIpoForm holdingId={id} onChanged={onChanged} />}
-      <OfferPositionForm holdingId={id} onChanged={onChanged} />
+      <OfferPositionForm holdingId={id} holding={holding} onChanged={onChanged} />
       <MyPositionPanel holdingId={id} onChanged={onChanged} />
     </div>
   )
