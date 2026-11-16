@@ -60,6 +60,15 @@ export function ProposeForm({
   // uncommittedTotal, silently, with no proposal record left behind.
   const budgetSpendsPoolFunds = isBuyQswap || isBuyQx || isIpo
   const budgetExceedsFunds = budgetSpendsPoolFunds && !!quAmount && BigInt(quAmount) > availableFunds
+  // BUY_IPO's initial bid has no shares/quantity field at all -- confirmed
+  // directly in QPoolK6.h's Propose(): the KIND_BUY_IPO branch never reads
+  // input.shares, only quAmount (budget cap) and price. It's a uniform-price
+  // auction: shares actually won = budget/price, filled up to availability
+  // at execution, the same as RebidIpo's own "price * quantity <= budget"
+  // relationship -- just not chosen directly on the first bid. Showing the
+  // implied count here instead of a fake input surfaces that without lying
+  // about what the contract will actually do with it.
+  const impliedIpoShares = isIpo && quAmount && price && BigInt(price) > 0n ? BigInt(quAmount) / BigInt(price) : null
   const budgetLabel = isIpo
     ? 'Budget (max QU for this bid) *'
     : isBuyQswap || isBuyQx
@@ -190,6 +199,13 @@ export function ProposeForm({
         <Field label={priceLabel}>
           <AmountInput value={price} onChange={setPrice} />
         </Field>
+      )}
+      {isIpo && (
+        <div className="text-[11px] text-muted-foreground">
+          {impliedIpoShares !== null
+            ? `≈ ${impliedIpoShares.toLocaleString()} shares at this price (budget ÷ price) -- you don't pick a share count directly; this bid wins up to that many, limited by what's actually available at this price when it executes. Adjust with RebidIpo afterward if you want more or fewer.`
+            : "You don't pick a share count directly for the initial bid -- it's whatever your budget buys at this price (budget ÷ price), up to what's available. Fill in both above to see the estimate."}
+        </div>
       )}
 
       <Button disabled={busy || !canSubmit} onClick={() => void submit()}>
