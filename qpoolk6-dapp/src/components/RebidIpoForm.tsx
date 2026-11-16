@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { Holding } from '../qubic/decode'
 import { useWallet } from '../context/WalletContext'
 import { submitProcedureCall } from '../qubic/transaction'
 import { payRebidIpo, paySettleIpo } from '../qubic/encode'
@@ -6,7 +7,9 @@ import { QPOOLK6, P_REBID_IPO, P_SETTLE_IPO } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { AmountInput, Button, ErrorText, Field, SuccessText } from './ui'
 
-export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onChanged?: () => void }) {
+export function RebidIpoForm({
+  holdingId, holding, onChanged,
+}: { holdingId: number; holding: Holding; onChanged?: () => void }) {
   const { wallet } = useWallet()
   const [price, setPrice] = useState('')
   const [quantity, setQuantity] = useState('')
@@ -14,6 +17,17 @@ export function RebidIpoForm({ holdingId, onChanged }: { holdingId: number; onCh
   const settle = useAction<string>()
 
   if (!wallet) return null
+
+  // Once settled, the IPO's shares are final -- RebidIpo/SettleIpo both
+  // refuse at that point, so showing "Update bid"/"Settle now" afterward
+  // just reads as still-live and confuses a seller checking their holding.
+  if (holding.ipoSettled > 0n) {
+    return (
+      <div className="text-[11px] text-muted-foreground border-t border-border pt-1 mt-1">
+        IPO settled -- shares are final, nothing left to bid or settle.
+      </div>
+    )
+  }
 
   async function submitRebid() {
     await rebid.run(async () => {
