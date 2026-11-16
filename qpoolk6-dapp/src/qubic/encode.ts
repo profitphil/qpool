@@ -9,6 +9,9 @@ export function payCreatePool(name: string, permissioned = 0): Uint8Array {
 export function payContribute(poolId: number): Uint8Array {
   return u64(poolId)
 }
+export function payRescaleHolding(holdingId: number, factor: bigint | number): Uint8Array {
+  return concatBytes(u64(holdingId), u64(factor))
+}
 export function payJoinPool(poolId: number): Uint8Array {
   return u64(poolId)
 }

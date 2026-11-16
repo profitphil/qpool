@@ -6,6 +6,7 @@ import { QPOOLK6, P_CLAIM_PAYOUT } from '../qubic/config'
 import { useAction } from '../hooks/useAction'
 import { Button, ErrorText, KV, SuccessText } from './ui'
 import { OfferPositionForm } from './OfferPositionForm'
+import { RescaleHoldingForm } from './RescaleHoldingForm'
 import { MyPositionPanel } from './MyPositionPanel'
 import { RebidIpoForm } from './RebidIpoForm'
 
@@ -50,6 +51,7 @@ export function HoldingRow({ id, holding, onChanged }: { id: number; holding: Ho
       <ErrorText>{error}</ErrorText>
       <SuccessText>{result}</SuccessText>
       {isIpo && <RebidIpoForm holdingId={id} holding={holding} onChanged={onChanged} />}
+      <RescaleHoldingForm holdingId={id} holding={holding} onChanged={onChanged} />
       <OfferPositionForm holdingId={id} holding={holding} onChanged={onChanged} />
       <MyPositionPanel holdingId={id} onChanged={onChanged} />
     </div>
