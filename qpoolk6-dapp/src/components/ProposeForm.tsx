@@ -51,32 +51,35 @@ export function ProposeForm({
   const showHoldingPicker = isSellOrAllocate
   const showIpoTarget = isIpo
   const showPayerIndex = isBuyQx && contractShares
-  const showShares = isBuyQswap || isBuyQx || kind === KIND_SELL_QSWAP || kind === KIND_SELL_QX || kind === KIND_SELL_QX_LIMIT
+  const showShares = isBuyQswap || isBuyQx || isIpo || kind === KIND_SELL_QSWAP || kind === KIND_SELL_QX || kind === KIND_SELL_QX_LIMIT
   const showPrice = isBuyQx || isIpo || kind === KIND_SELL_QX || kind === KIND_SELL_QX_LIMIT
-  const showBudget = kind !== KIND_SELL_QX_LIMIT // forced to 0 for SELL_QX_LIMIT (QPoolK6.h requires quAmount==0 there)
+  // IPO's budget is DERIVED (shares * price), not entered directly -- see
+  // impliedIpoCost below. SELL_QX_LIMIT forces quAmount to 0 (QPoolK6.h
+  // requires it there).
+  const showBudget = kind !== KIND_SELL_QX_LIMIT && !isIpo
   // Only BUY_* kinds spend the pool's own funds (quAmount is a budget, not a
   // floor like it is for SELL_*) -- confirmed directly in QPoolK6.h's
   // Propose(): all three refuse with INVALID_INPUT if quAmount exceeds
   // uncommittedTotal, silently, with no proposal record left behind.
   const budgetSpendsPoolFunds = isBuyQswap || isBuyQx || isIpo
-  const budgetExceedsFunds = budgetSpendsPoolFunds && !!quAmount && BigInt(quAmount) > availableFunds
-  // BUY_IPO's initial bid has no shares/quantity field at all -- confirmed
-  // directly in QPoolK6.h's Propose(): the KIND_BUY_IPO branch never reads
-  // input.shares, only quAmount (budget cap) and price. It's a uniform-price
-  // auction: shares actually won = budget/price, filled up to availability
-  // at execution, the same as RebidIpo's own "price * quantity <= budget"
-  // relationship -- just not chosen directly on the first bid. Showing the
-  // implied count here instead of a fake input surfaces that without lying
-  // about what the contract will actually do with it.
-  const impliedIpoShares = isIpo && quAmount && price && BigInt(price) > 0n ? BigInt(quAmount) / BigInt(price) : null
-  const budgetLabel = isIpo
-    ? 'Budget (max QU for this bid) *'
+  // BUY_IPO's initial bid now takes shares and price directly (K9: QPoolK6.h
+  // requires quAmount == price*shares exactly for this kind), so a pool can
+  // deliberately bid for fewer shares than its full budget would buy --
+  // staggering across multiple bids -- instead of always committing
+  // everything to the first one.
+  const impliedIpoCost = isIpo && shares && price ? BigInt(shares) * BigInt(price) : null
+  const budgetExceedsFunds = budgetSpendsPoolFunds
+    && ((isIpo ? impliedIpoCost : quAmount ? BigInt(quAmount) : null) ?? 0n) > availableFunds
+  const budgetLabel = isBuyQswap || isBuyQx
+    ? 'Budget (QU to spend)'
+    : kind === KIND_ALLOCATE
+      ? 'Amount to allocate (QU)'
+      : 'Minimum proceeds (QU) -- refuses rather than sell for less'
+  const sharesLabel = isIpo
+    ? 'Shares to bid for *'
     : isBuyQswap || isBuyQx
-      ? 'Budget (QU to spend)'
-      : kind === KIND_ALLOCATE
-        ? 'Amount to allocate (QU)'
-        : 'Minimum proceeds (QU) -- refuses rather than sell for less'
-  const sharesLabel = isBuyQswap || isBuyQx ? 'Minimum shares you will accept' : 'Shares to sell'
+      ? 'Minimum shares you will accept'
+      : 'Shares to sell'
   const priceLabel = isIpo
     ? 'Opening bid, per share *'
     : isBuyQx
@@ -103,7 +106,7 @@ export function ProposeForm({
         kind,
         showTokenFields ? issuerId : NULL_ID,
         showTokenFields ? nameToU64(assetName) : 0n,
-        kind === KIND_SELL_QX_LIMIT ? 0n : BigInt(quAmount || 0),
+        kind === KIND_SELL_QX_LIMIT ? 0n : isIpo ? (impliedIpoCost ?? 0n) : BigInt(quAmount || 0),
         showShares ? BigInt(shares || 0) : 0n,
         showPrice ? BigInt(price || 0) : 0n,
         Number(holdingOrTargetId || 0),
@@ -157,9 +160,9 @@ export function ProposeForm({
       )}
       {isIpo && (
         <div className="text-xs text-muted-foreground">
-          There's no way to know how much the pool will have collected by the time this executes -- pick the most
-          QU you want to commit to this bid now. You can raise it later with RebidIpo if more comes in, but the
-          proposal itself needs a concrete number, not a guess at the pool's future balance.
+          Pick how many shares to bid for now and at what price -- you don't have to use the pool's whole budget on
+          the first bid. Leave some uncommitted to stagger a second bid later, or raise this one with RebidIpo once
+          more funds come in.
         </div>
       )}
 
@@ -191,7 +194,7 @@ export function ProposeForm({
         </ErrorText>
       )}
       {showShares && (
-        <Field label={sharesLabel}>
+        <Field label={sharesLabel} hint={isIpo ? 'Max 676 -- the whole IPO only has that many seats.' : undefined}>
           <AmountInput value={shares} onChange={setShares} />
         </Field>
       )}
@@ -202,9 +205,9 @@ export function ProposeForm({
       )}
       {isIpo && (
         <div className="text-[11px] text-muted-foreground">
-          {impliedIpoShares !== null
-            ? `≈ ${impliedIpoShares.toLocaleString()} shares at this price (budget ÷ price) -- you don't pick a share count directly; this bid wins up to that many, limited by what's actually available at this price when it executes. Adjust with RebidIpo afterward if you want more or fewer.`
-            : "You don't pick a share count directly for the initial bid -- it's whatever your budget buys at this price (budget ÷ price), up to what's available. Fill in both above to see the estimate."}
+          {impliedIpoCost !== null
+            ? `= ${impliedIpoCost.toLocaleString()} QU committed to this bid (shares × price) -- the rest of the pool's uncommitted funds stay free for a later bid.`
+            : 'Fill in shares and price above to see the QU this bid will commit.'}
         </div>
       )}
 
