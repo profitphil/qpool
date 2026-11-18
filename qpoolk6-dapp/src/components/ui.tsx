@@ -236,6 +236,37 @@ export function Avatar({ seed, size = 32 }: { seed: string; size?: number }) {
   )
 }
 
+export function SubTabs<T extends string>({
+  tabs, active, onChange,
+}: {
+  tabs: { key: T; label: string; badge?: ReactNode }[]
+  active: T
+  onChange: (key: T) => void
+}) {
+  return (
+    <div className="flex gap-1 flex-wrap border-b border-border">
+      {tabs.map((t) => {
+        const isActive = t.key === active
+        return (
+          <button
+            key={t.key}
+            onClick={() => onChange(t.key)}
+            className={cx(
+              'flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-t-lg border-b-2 -mb-px transition-colors',
+              isActive
+                ? 'border-primary text-foreground bg-accent/50'
+                : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50',
+            )}
+          >
+            {t.label}
+            {t.badge}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
 export function EmptyState({ icon = '○', title, hint }: { icon?: ReactNode; title: string; hint?: string }) {
   return (
     <div className="flex flex-col items-center justify-center text-center gap-1 py-8 text-muted-foreground">

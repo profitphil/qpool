@@ -4,7 +4,7 @@ import { getPool, type Pool } from '../qubic/decode'
 import { getTick } from '../qubic/rpc'
 import { scanHoldingsForPool, scanProposalsForPool } from '../qubic/scan'
 import type { Holding, Proposal } from '../qubic/decode'
-import { Badge, Button, Card, ErrorText, Identity, KV } from './ui'
+import { Badge, Button, Card, ErrorText, Identity, KV, SubTabs } from './ui'
 import { ContributeForm } from './ContributeForm'
 import { DepositHoldingAssetForm } from './DepositHoldingAssetForm'
 import { ProposeForm } from './ProposeForm'
@@ -13,8 +13,11 @@ import { ProposalRow } from './ProposalRow'
 import { SeatMarket } from './SeatMarket'
 import { IconLayers, IconList, IconPool, IconUpload, IconVote, IconWallet } from './icons'
 
+type DetailTab = 'overview' | 'governance' | 'holdings' | 'admin'
+
 export function PoolDetail({ poolId }: { poolId: number }) {
   const { wallet } = useWallet()
+  const [tab, setTab] = useState<DetailTab>('overview')
   const [pool, setPool] = useState<Pool | null>(null)
   const [holdings, setHoldings] = useState<{ id: number; holding: Holding }[]>([])
   const [proposals, setProposals] = useState<{ id: number; proposal: Proposal }[]>([])
@@ -85,6 +88,10 @@ export function PoolDetail({ poolId }: { poolId: number }) {
   if (pool.found !== 1) return <ErrorText>Pool #{poolId} not found.</ErrorText>
 
   const isCreator = wallet?.identity === pool.creator
+  // Admin's own tab only makes sense for the creator -- bounce anyone else
+  // (or the creator's own wallet disconnecting mid-session) off it rather
+  // than render an empty tab body.
+  const effectiveTab: DetailTab = tab === 'admin' && !isCreator ? 'overview' : tab
 
   return (
     <div className="space-y-4">
@@ -104,51 +111,62 @@ export function PoolDetail({ poolId }: { poolId: number }) {
         <ErrorText>{error}</ErrorText>
       </Card>
 
-      <div className="grid md:grid-cols-2 gap-4 items-start">
+      <SubTabs
+        tabs={[
+          { key: 'overview', label: 'Overview' },
+          { key: 'governance', label: `Governance${proposals.length ? ` (${proposals.length})` : ''}` },
+          { key: 'holdings', label: `Holdings${holdings.length ? ` (${holdings.length})` : ''}` },
+          ...(isCreator ? [{ key: 'admin' as const, label: 'Admin' }] : []),
+        ]}
+        active={effectiveTab}
+        onChange={setTab}
+      />
+
+      {effectiveTab === 'overview' && (
         <Card title="Join / contribute" icon={<IconWallet />} iconTone="success">
           <ContributeForm poolId={poolId} onChanged={loadPool} />
         </Card>
+      )}
 
-        <Card title="Propose a pool action" icon={<IconVote />} iconTone="warning">
-          <ProposeForm poolId={poolId} holdings={holdings} availableFunds={pool.uncommittedTotal} onChanged={loadExtras} />
-        </Card>
-
-        {isCreator && (
-          <Card
-            title="Deposit a token"
-            icon={<IconUpload />}
-            iconTone="info"
-            right={<Badge tone="info">creator only</Badge>}
-            interactive
-          >
-            <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
+      {effectiveTab === 'governance' && (
+        <div className="space-y-4">
+          <Card title="Propose a pool action" icon={<IconVote />} iconTone="warning">
+            <ProposeForm poolId={poolId} holdings={holdings} availableFunds={pool.uncommittedTotal} onChanged={loadExtras} />
           </Card>
-        )}
-      </div>
-
-      <SeatMarket poolId={poolId} />
-
-      <Card title={`Holdings (${holdings.length} found, scanned)`} icon={<IconLayers />} iconTone="neutral">
-        <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {holdings.map(({ id, holding }) => (
-            <HoldingRow key={id} id={id} holding={holding} onChanged={loadExtras} />
-          ))}
+          <Card title={`Proposals (${proposals.length} found, scanned)`} icon={<IconList />} iconTone="neutral">
+            <div className="text-xs text-muted-foreground">
+              A busy shared tunnel can occasionally undercount on the very first load -- if you just submitted a
+              proposal and don't see it below, rescan before assuming it failed.
+            </div>
+            <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {proposals.map(({ id, proposal }) => (
+                <ProposalRow key={id} id={id} proposal={proposal} currentTick={tick} onChanged={loadExtras} />
+              ))}
+            </div>
+          </Card>
         </div>
-      </Card>
+      )}
 
-      <Card title={`Proposals (${proposals.length} found, scanned)`} icon={<IconList />} iconTone="neutral">
-        <div className="text-xs text-muted-foreground">
-          A busy shared tunnel can occasionally undercount on the very first load -- if you just submitted a
-          proposal and don't see it below, rescan before assuming it failed.
+      {effectiveTab === 'holdings' && (
+        <div className="space-y-4">
+          <SeatMarket poolId={poolId} />
+          <Card title={`Holdings (${holdings.length} found, scanned)`} icon={<IconLayers />} iconTone="neutral">
+            <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {holdings.map(({ id, holding }) => (
+                <HoldingRow key={id} id={id} holding={holding} onChanged={loadExtras} />
+              ))}
+            </div>
+          </Card>
         </div>
-        <Button loading={loadingExtras} onClick={() => void loadExtras()}>rescan</Button>
-        <div className="grid sm:grid-cols-2 gap-2">
-          {proposals.map(({ id, proposal }) => (
-            <ProposalRow key={id} id={id} proposal={proposal} currentTick={tick} onChanged={loadExtras} />
-          ))}
-        </div>
-      </Card>
+      )}
+
+      {effectiveTab === 'admin' && isCreator && (
+        <Card title="Deposit a token" icon={<IconUpload />} iconTone="info" right={<Badge tone="info">creator only</Badge>}>
+          <DepositHoldingAssetForm poolId={poolId} onChanged={loadExtras} />
+        </Card>
+      )}
     </div>
   )
 }

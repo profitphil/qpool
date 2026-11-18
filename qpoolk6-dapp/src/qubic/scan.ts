@@ -4,7 +4,7 @@
 // scan ranges, not exhaustive: fine for a demo/testing UI, not for a pool
 // with thousands of entries.
 import {
-  getPool, getHolding, getProposal, getPoolOffers, getAssetAskOrders,
+  getPool, getHolding, getProposal, getPoolOffers, getAssetAskOrders, getMember,
   type Pool, type Holding, type Proposal, type PoolOffer,
 } from './decode'
 
@@ -31,6 +31,16 @@ export async function scanPools(maxScan = 100): Promise<{ id: number; pool: Pool
   const ids = Array.from({ length: maxScan }, (_, i) => i)
   const pools = await mapLimited(ids, SCAN_CONCURRENCY, (id) => getPool(id))
   return ids.map((id, i) => ({ id, pool: pools[i] })).filter((p) => p.pool.found === 1)
+}
+
+// Reuses an already-scanned pool list -- no "list my pools" query exists,
+// so the only way to find out which of them a wallet belongs to is one
+// GetMember call per pool, same concurrency cap as every other scan here.
+export async function filterJoinedPools(
+  pools: { id: number; pool: Pool }[], memberId: string,
+): Promise<{ id: number; pool: Pool }[]> {
+  const members = await mapLimited(pools, SCAN_CONCURRENCY, (p) => getMember(p.id, memberId))
+  return pools.filter((_, i) => members[i].found === 1)
 }
 
 export async function scanHoldingsForPool(poolId: number, maxScan = 200): Promise<{ id: number; holding: Holding }[]> {
